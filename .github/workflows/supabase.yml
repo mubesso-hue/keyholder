@@ -1,0 +1,48 @@
+name: Supabase schema
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/**", "scripts/**", ".github/workflows/supabase.yml"]
+  pull_request:
+    paths: ["supabase/**", "scripts/**", ".github/workflows/supabase.yml"]
+  workflow_dispatch:
+
+jobs:
+  schema-test:
+    name: Migration + scenario on Postgres 16
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -q && sudo apt-get install -y -q postgresql-client
+      - name: Run schema test
+        env:
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: scripts/test_schema.sh
+
+  typecheck-functions:
+    name: Type-check edge functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/device-event/index.ts supabase/functions/send-push/index.ts

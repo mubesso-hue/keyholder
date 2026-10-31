@@ -1,7 +1,11 @@
 // send-push: delivers rows from the `notifications` outbox to APNs.
 //
-// Wire it up as a Database Webhook: table `notifications`, event INSERT,
-// HTTP POST to this function, with header `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`.
+// Triggered by a pg_net call from the database (see migrations/0002_push_webhook.sql)
+// with body { record: { id } }. The function never trusts the payload beyond the id:
+// it loads the row with the service role and only sends rows that are still unsent.
+// That makes the endpoint safe to expose without a shared secret: the worst an
+// outsider can do is deliver a notification that was going to be delivered anyway.
+// Set PUSH_WEBHOOK_SECRET to additionally require an `x-webhook-secret` header.
 //
 // Required function secrets:
 //   APNS_TEAM_ID        Apple developer team id
@@ -9,7 +13,8 @@
 //   APNS_PRIVATE_KEY    contents of the .p8 file (PEM, newlines allowed)
 //   APNS_BUNDLE_ID      the app's bundle id (apns-topic)
 //   APNS_ENV            "sandbox" for development builds, "production" for TestFlight/App Store
-//   PUSH_WEBHOOK_SECRET shared secret checked on every call
+// Optional:
+//   PUSH_WEBHOOK_SECRET shared secret checked on every call when set
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -22,12 +27,7 @@ type NotificationRow = {
   body: string;
   category: string;
   data: Record<string, unknown>;
-};
-
-type WebhookPayload = {
-  type: "INSERT" | "UPDATE" | "DELETE";
-  table: string;
-  record: NotificationRow | null;
+  sent_at: string | null;
 };
 
 const json = (body: unknown, status = 200) =>
@@ -48,6 +48,10 @@ async function apnsJwt(): Promise<string> {
     .sign(key);
   cachedJwt = { token, issuedAt: now };
   return token;
+}
+
+function apnsConfigured(): boolean {
+  return ["APNS_TEAM_ID", "APNS_KEY_ID", "APNS_PRIVATE_KEY", "APNS_BUNDLE_ID"].every((k) => !!Deno.env.get(k));
 }
 
 function apnsHost(): string {
@@ -90,30 +94,51 @@ async function sendToDevice(token: string, n: NotificationRow): Promise<{ ok: bo
   return { ok: false, status: res.status, reason };
 }
 
+function extractId(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  const record = p.record && typeof p.record === "object" ? (p.record as Record<string, unknown>) : null;
+  const raw = record?.id ?? p.id;
+  const id = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  return Number.isFinite(id) ? id : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
 
-  const expected = Deno.env.get("PUSH_WEBHOOK_SECRET") ?? "";
-  if (!expected || req.headers.get("x-webhook-secret") !== expected) {
+  const expected = Deno.env.get("PUSH_WEBHOOK_SECRET");
+  if (expected && req.headers.get("x-webhook-secret") !== expected) {
     return json({ error: "unauthorized" }, 401);
   }
 
-  let payload: WebhookPayload;
+  let payload: unknown;
   try {
     payload = await req.json();
   } catch {
     return json({ error: "invalid json" }, 400);
   }
-  if (payload.type !== "INSERT" || payload.table !== "notifications" || !payload.record) {
-    return json({ skipped: true });
-  }
-  const n = payload.record;
+  const id = extractId(payload);
+  if (id === null) return json({ error: "notification id required" }, 400);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { persistSession: false } },
   );
+
+  const { data: n, error: loadError } = await supabase
+    .from("notifications")
+    .select("id, user_id, title, body, category, data, sent_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (loadError) return json({ error: loadError.message }, 500);
+  if (!n) return json({ skipped: "not found" }, 404);
+  if (n.sent_at) return json({ skipped: "already sent" });
+
+  if (!apnsConfigured()) {
+    // Leave sent_at null so the row is retried once APNs secrets exist.
+    return json({ skipped: "apns not configured", id });
+  }
 
   const { data: devices, error } = await supabase
     .from("devices")
@@ -124,7 +149,7 @@ Deno.serve(async (req) => {
 
   const results: Array<{ device: string; ok: boolean; status: number; reason?: string }> = [];
   for (const d of devices ?? []) {
-    const r = await sendToDevice(d.apns_token as string, n);
+    const r = await sendToDevice(d.apns_token as string, n as NotificationRow);
     results.push({ device: d.id, ...r });
     // Token is dead: forget it so we stop retrying.
     if (!r.ok && (r.status === 410 || r.reason === "BadDeviceToken" || r.reason === "Unregistered")) {

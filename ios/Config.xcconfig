@@ -1,10 +1,13 @@
-// Fill these in before running `xcodegen generate`.
+// Build configuration. The Supabase values below are the real keyholder project;
+// the anon key is designed to be public (row level security does the protecting).
 //
 // NOTE: `//` starts a comment in xcconfig, so URLs need the $() trick below.
 
+// Your Apple developer team id (Apple Developer › Membership).
 DEVELOPMENT_TEAM = ABCDE12345
+
 APP_BUNDLE_ID = com.keyholder.app
 APP_GROUP_ID = group.com.keyholder.app
 
-SUPABASE_URL = https:$()//YOUR-PROJECT-REF.supabase.co
-SUPABASE_ANON_KEY = YOUR-ANON-KEY
+SUPABASE_URL = https:$()//apatxdwaozoozkigrgbt.supabase.co
+SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFwYXR4ZHdhb3pvb3praWdyZ2J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDg2NTAsImV4cCI6MjEwOTAyNDY1MH0.2H4cM2CbBKRie3waDBL89HweeVA0E9YJ6P3QENhFlqM
