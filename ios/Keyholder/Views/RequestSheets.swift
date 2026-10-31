@@ -64,7 +64,7 @@ struct DecideRequestSheet: View {
             List {
                 Section {
                     if let request {
-                        Text(request.requestedMinutes.map { "\(held.profile.displayName) is asking for \($0) minutes." }
+                        Text(request.requestedMinutes.map { "\(held.profile.displayName) is asking for \(UnlockDuration.format(minutes: $0))." }
                              ?? "\(held.profile.displayName) is asking for time.")
                     } else {
                         Text("\(held.profile.displayName) has not asked. You can still give time.")

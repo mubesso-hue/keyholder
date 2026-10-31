@@ -156,6 +156,7 @@
   .list .item:last-child { border-bottom: 0; }
   .list .item.danger { color: #FFB347; }
   .list .item .m { font-size: 13px; color: var(--w40); }
+  select.dur { flex: 1; font: inherit; font-size: 15px; color: var(--w); background: var(--w08); border: 1px solid var(--w15); border-radius: 10px; padding: 9px 10px; }
   .seg { display: flex; background: var(--w08); border: 1px solid var(--w15); border-radius: 12px; padding: 3px; margin: 8px 0 14px; }
   .seg button { flex: 1; border: 0; background: transparent; color: var(--w60); padding: 8px; border-radius: 9px; font: inherit; font-size: 13px; cursor: pointer; }
   .seg button.on { background: var(--w); color: var(--ink); font-weight: 600; }
@@ -226,7 +227,7 @@ const APPS = [
 const NEVER_BLOCKED = new Set(['messages', 'phone']);
 let S;
 const newStreak = () => ({ startedAt: null, paused: 0, pauseStart: null, pauseUntil: null, best: 0, graceUntil: null });
-const newUI = () => ({ sheet: null, lockStep: 1, selected: new Set(['instagram', 'tiktok', 'x']), coolingOff: 24, decideFor: null, shield: null, toast: null, bgConfirm: false });
+const newUI = () => ({ sheet: null, lockStep: 0, mode: 'allExcept', allowed: new Set(['messages', 'phone']), selected: new Set(['instagram', 'tiktok', 'x']), coolingOff: 24, decideFor: null, shield: null, toast: null, bgConfirm: false, custom: { open: false, h: 0, m: 45 } });
 
 function resetAll() {
   const mutual = document.getElementById('mutual').checked;
@@ -288,11 +289,18 @@ const isShielded = (u) => { const b = activeBlock(u); return !!b && !(b.unlockUn
 const pendingRequest = (u) => S.requests.find(r => r.from === u && r.status === 'pending') ?? null;
 function notify(to, title, body, category, data = {}) { S.notifs[to].unshift({ id: Math.random(), title, body, category, data, at: now() }); S.notifs[to] = S.notifs[to].slice(0, 3); }
 
-function startBlock(u, apps, coolingOff) {
+// mode 'allExcept': every app except the allowed ones is blocked (mirrors start_block p_mode).
+function startBlock(u, coolingOff) {
   const h = holderOf(u); if (!h) return toast(u, 'Nobody holds your key');
-  S.blocks[u] = { status: 'active', apps: new Set(apps), coolingOff, startedAt: now(), unlockUntil: null, bgEndsAt: null };
+  const ui = S.ui[u];
+  const apps = ui.mode === 'allExcept' ? new Set(APPS.map(a => a.id).filter(id => !ui.allowed.has(id))) : new Set(ui.selected);
+  const b = { status: 'active', apps, mode: ui.mode, allowedCount: ui.allowed.size, coolingOff, startedAt: now(), unlockUntil: null, bgEndsAt: null };
+  S.blocks[u] = b;
   streakStart(u);
-  notify(h, `${USERS[u].name} locked their phone`, `You hold the key. ${apps.size} apps blocked.`, 'BLOCK_STARTED');
+  notify(h, `${USERS[u].name} locked their phone`, `You hold the key. ${blockSummary(b)}.`, 'BLOCK_STARTED');
+}
+function blockSummary(b) {
+  return b.mode === 'allExcept' ? `Everything except ${b.allowedCount} ${b.allowedCount === 1 ? 'app' : 'apps'}` : `${b.apps.size} apps blocked`;
 }
 function endBlock(u, reason) {
   const b = activeBlock(u); if (!b) return;
@@ -384,7 +392,18 @@ function tapApp(u, id) {
   if (b && b.apps.has(id) && isShielded(u)) { S.ui[u].shield = id; render(); }
   else toast(u, `${APPS.find(a => a.id === id).name} opened`);
 }
-function pressLock(u) { haptic(); openSheet(u, 'lock', { lockStep: 1 }); }
+function pressLock(u) { haptic(); openSheet(u, 'lock', { lockStep: 0 }); }
+function toggleAllowed(u, id) { const s = S.ui[u].allowed; s.has(id) ? s.delete(id) : s.add(id); render(); }
+function setCustom(u, k, v) { S.ui[u].custom[k] = Number(v); render(); }
+function customRow(u, verb, goCode) {
+  const c = S.ui[u].custom, total = c.h * 60 + c.m, ok = total >= 15 && total <= 1440;
+  if (!c.open) return `<div class="item" onclick="S.ui['${u}'].custom.open=true;render()"><span>Custom…</span><span class="m">▾</span></div>`;
+  const hs = Array.from({ length: 25 }, (_, i) => `<option value="${i}" ${i === c.h ? 'selected' : ''}>${i} h</option>`).join('');
+  const ms = Array.from({ length: 12 }, (_, i) => i * 5).map(m => `<option value="${m}" ${m === c.m ? 'selected' : ''}>${m} min</option>`).join('');
+  const label = ok ? `${verb} ${fmtDur(total)}` : (total < 15 ? 'At least 15 minutes' : 'At most 24 hours');
+  return `<div class="item" style="flex-direction:column;align-items:stretch;gap:10px;cursor:default"><div style="display:flex;gap:8px"><select class="dur" onchange="setCustom('${u}','h',this.value)">${hs}</select><select class="dur" onchange="setCustom('${u}','m',this.value)">${ms}</select></div><button class="btn primary" style="margin:0" ${ok ? '' : 'disabled'} onclick="${goCode.replace('MINUTES', total)}">${label}</button></div>`;
+}
+function fmtDur(min) { const h = Math.floor(min / 60), m = min % 60; return h === 0 ? `${m} min` : (m === 0 ? `${h} h` : `${h} h ${m} min`); }
 function shieldAsk(u) { S.askedAt[u] = now(); requestUnlock(u, null, 'shield'); S.ui[u].shield = null; render(); }
 function dismissNotif(u, id) { S.notifs[u] = S.notifs[u].filter(n => n.id !== id); render(); }
 function act(fn) { fn(); tick(); render(); }
@@ -470,7 +489,7 @@ function hero(u) {
       html += `<div class="glass bgpanel"><div class="row"><b>Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}</b><button class="link" onclick="act(()=>cancelBreakGlass('${u}'))">Cancel</button></div><div class="muted">Your streak resets when it completes. Cancel any time before ${dtm(b.bgEndsAt)} to keep it.</div></div>`;
     }
     html += `<div class="actions">`;
-    if (pr) html += `<span class="waiting">Asked ${hName}${pr.minutes ? ` for ${pr.minutes} min` : ''}. Waiting…</span>`;
+    if (pr) html += `<span class="waiting">Asked ${hName}${pr.minutes ? ` for ${fmtDur(pr.minutes)}` : ''}. Waiting…</span>`;
     else html += `<button class="pill" onclick="openSheet('${u}','request')">Ask ${hName} for time</button>`;
     if (!b.bgEndsAt) html += `<button class="pill icon" title="Break Glass" onclick="openSheet('${u}','breakglass')">···</button>`;
     html += `</div>`;
@@ -506,9 +525,9 @@ function heldRow(h, u) {
   let html = `<div class="glass hrow"><div class="row" style="display:flex;justify-content:space-between;align-items:baseline"><span class="name">${name}</span><span class="status">${status}</span></div>`;
   if (b) {
     html += `<div class="meta"><span class="t">${clock(streakSeconds(s))}</span><span class="r">RECORD ${fmt(Math.max(s.best, streakSeconds(s)))}</span></div>`;
-    html += `<div class="small">${b.apps.size} apps blocked · ${S.weekRequests[u]} requests this week${b.bgEndsAt ? ` · Broke the glass, ends in ${fmt((b.bgEndsAt - now()) / 1000)}` : ''}</div>`;
+    html += `<div class="small">${blockSummary(b)} · ${S.weekRequests[u]} requests this week${b.bgEndsAt ? ` · Broke the glass, ends in ${fmt((b.bgEndsAt - now()) / 1000)}` : ''}</div>`;
     if (pr) {
-      html += `<div class="ask">${pr.minutes ? `Asking for ${pr.minutes} min` : 'Asking for time'}</div><div class="mini"><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',15))">15 min</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',60))">1 hour</button><button class="pill" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">More…</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'denied'))">No</button></div>`;
+      html += `<div class="ask">${pr.minutes ? `Asking for ${fmtDur(pr.minutes)}` : 'Asking for time'}</div><div class="mini"><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',15))">15 min</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',60))">1 hour</button><button class="pill" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">More…</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'denied'))">No</button></div>`;
     } else {
       html += `<div class="mini"><button class="pill" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">Give time…</button></div>`;
     }
@@ -519,9 +538,9 @@ function heldRow(h, u) {
 }
 
 function appsRow(u) {
-  const b = activeBlock(u), sel = S.ui[u].selected;
+  const b = activeBlock(u), ui = S.ui[u];
   return `<div class="apps"><div class="label">BLOCKED WHEN LOCKED</div><div class="row">${APPS.map(a => {
-    const willBlock = b ? b.apps.has(a.id) : sel.has(a.id);
+    const willBlock = b ? b.apps.has(a.id) : (ui.mode === 'allExcept' ? !ui.allowed.has(a.id) : ui.selected.has(a.id));
     const cls = ['app', willBlock ? '' : 'off', (b && b.apps.has(a.id) && isShielded(u)) ? 'blocked' : ''].join(' ');
     return `<div class="${cls}" title="${a.name}" onclick="tapApp('${u}','${a.id}')">${brandMark(a.id)}</div>`;
   }).join('')}</div></div>`;
@@ -532,19 +551,26 @@ function sheet(u) {
   if (!ui.sheet) return '';
   let inner = '';
   if (ui.sheet === 'lock') {
-    if (ui.lockStep === 1) {
-      inner = `<h3>Choose apps</h3><div class="list">${APPS.filter(a => !NEVER_BLOCKED.has(a.id)).map(a => `<div class="item" onclick="toggleApp('${u}','${a.id}')"><span style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;display:inline-flex">${brandMark(a.id)}</span>${a.name}</span><span class="m">${ui.selected.has(a.id) ? '<span style="color:#FFB347">●</span>' : '○'}</span></div>`).join('')}</div><p class="note">Phone and Messages can never be blocked. On iOS this is Apple's own picker and the app never learns which apps you chose.</p><button class="btn primary" ${ui.selected.size ? '' : 'disabled'} onclick="S.ui['${u}'].lockStep=2;render()">Next</button><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+    const appItem = (a, on, toggle) => `<div class="item" onclick="${toggle}('${u}','${a.id}')"><span style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;display:inline-flex">${brandMark(a.id)}</span>${a.name}</span><span class="m">${on ? '<span style="color:#FFB347">●</span>' : '○'}</span></div>`;
+    const modeItem = (mode, title, detail, badge) => `<div class="item" onclick="S.ui['${u}'].mode='${mode}';render()" style="align-items:flex-start;gap:12px"><span style="margin-top:2px;color:${ui.mode === mode ? '#FF7A00' : 'var(--w40)'}">${ui.mode === mode ? '●' : '○'}</span><span style="flex:1"><span style="display:flex;gap:8px;align-items:center;font-weight:600">${title}${badge ? `<span style="font-size:11px;font-weight:600;color:#FF7A00;background:rgba(255,122,0,.16);border-radius:999px;padding:2px 7px">${badge}</span>` : ''}</span><span class="m" style="display:block;margin-top:3px;line-height:1.45">${detail}</span></span></div>`;
+    if (ui.lockStep === 0) {
+      inner = `<h3>How do you want to lock?</h3><div class="list">${modeItem('allExcept', 'Everything except essentials', 'Every app is blocked except the few you keep open, like Phone, Messages, Maps and your bank. Apps you install later are blocked too.', 'Recommended')}${modeItem('selected', 'Only the apps I pick', 'Choose the apps or categories to block, such as Social and Games.', '')}</div><p class="note">Apple keeps your choices on this phone. Keyholder never sees which apps they are.</p><button class="btn primary" onclick="S.ui['${u}'].lockStep=1;render()">${ui.mode === 'allExcept' ? 'Choose what stays open' : 'Choose apps to block'}</button><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+    } else if (ui.lockStep === 1 && ui.mode === 'allExcept') {
+      const n = ui.allowed.size;
+      inner = `<h3>What stays open</h3><p class="note">Pick the apps that stay open. On iOS you can tap a whole category, such as Finance or Navigation. Your choice is remembered for next time.</p><div class="list">${APPS.map(a => appItem(a, ui.allowed.has(a.id), 'toggleAllowed')).join('')}</div><p class="note">${n === 0 ? 'Nothing kept open: every app will be blocked. Phone calls still work.' : `${n} ${n === 1 ? 'app stays' : 'apps stay'} open. Everything else is blocked.`}</p><button class="btn primary" onclick="S.ui['${u}'].lockStep=2;render()">Next</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=0;render()">Back</button>`;
+    } else if (ui.lockStep === 1) {
+      inner = `<h3>Apps to block</h3><div class="list">${APPS.filter(a => !NEVER_BLOCKED.has(a.id)).map(a => appItem(a, ui.selected.has(a.id), 'toggleApp')).join('')}</div><p class="note">On iOS this is Apple's own picker and the app never learns which apps you chose.</p><button class="btn primary" ${ui.selected.size ? '' : 'disabled'} onclick="S.ui['${u}'].lockStep=2;render()">Next</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=0;render()">Back</button>`;
     } else {
-      inner = `<h3>Cooling-off</h3><p class="note">If you ever need out without ${hName}, Break Glass ends the block after a wait. Choose the wait now, while you mean it.</p><div class="seg">${[12, 24, 48, 72].map(x => `<button class="${ui.coolingOff === x ? 'on' : ''}" onclick="S.ui['${u}'].coolingOff=${x};render()">${x === 12 ? '12 h' : (x / 24) + (x > 24 ? ' days' : ' day')}</button>`).join('')}</div><p class="note">You can make it longer later, never shorter.<br>${hName} is told the moment you break the glass.<br>Cancel before it completes and your streak survives.</p><button class="btn primary" onclick="haptic();act(()=>{startBlock('${u}',S.ui['${u}'].selected,S.ui['${u}'].coolingOff);S.ui['${u}'].sheet=null})">Lock</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=1;render()">Back</button>`;
+      inner = `<h3>Cooling-off</h3><p class="note">If you ever need out without ${hName}, Break Glass ends the block after a wait. Choose the wait now, while you mean it.</p><div class="seg">${[12, 24, 48, 72].map(x => `<button class="${ui.coolingOff === x ? 'on' : ''}" onclick="S.ui['${u}'].coolingOff=${x};render()">${x === 12 ? '12 h' : (x / 24) + (x > 24 ? ' days' : ' day')}</button>`).join('')}</div><p class="note">You can make it longer later, never shorter.<br>${hName} is told the moment you break the glass.<br>Cancel before it completes and your streak survives.</p><button class="btn primary" onclick="haptic();act(()=>{startBlock('${u}',S.ui['${u}'].coolingOff);S.ui['${u}'].sheet=null})">Lock</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=1;render()">Back</button>`;
     }
   } else if (ui.sheet === 'request') {
     const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
-    inner = `<h3>Ask ${hName}</h3><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="act(()=>{requestUnlock('${u}',${m},'app');S.ui['${u}'].sheet=null})"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}</div><p class="note">This is a suggestion. ${hName} picks the actual duration, and the block comes back on its own when it ends.</p><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+    inner = `<h3>Ask ${hName}</h3><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="act(()=>{requestUnlock('${u}',${m},'app');S.ui['${u}'].sheet=null})"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}${customRow(u, 'Ask for', `act(()=>{requestUnlock('${u}',MINUTES,'app');S.ui['${u}'].sheet=null;S.ui['${u}'].custom.open=false})`)}</div><p class="note">This is a suggestion. ${hName} picks the actual duration, and the block comes back on its own when it ends.</p><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
   } else if (ui.sheet === 'decide') {
     const t = ui.decideFor, pr = pendingRequest(t), b = activeBlock(t), tName = USERS[t].name;
     const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
     const run = (dec, m) => `act(()=>{${pr ? `decide(${JSON.stringify(pr.id)},'${dec}',${m})` : `holderUnlock('${u}','${t}','${dec}',${m})`};S.ui['${u}'].sheet=null})`;
-    inner = `<h3>${tName}</h3><p class="note block">${pr ? (pr.minutes ? `${tName} is asking for ${pr.minutes} minutes.` : `${tName} is asking for time.`) : `${tName} has not asked. You can still give time.`}<br><span style="color:var(--w60)">${S.weekRequests[t]} requests this week.${b && b.bgEndsAt ? ` Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}.` : ''}</span></p><div class="sectiontitle">GIVE TIME</div><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="${run('timed', m)}"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}</div><div class="list"><div class="item danger" onclick="${run('end', 'null')}">End their block</div>${pr ? `<div class="item" onclick="${run('denied', 'null')}">Say no</div>` : ''}</div><p class="note">Ending the block resets their streak. Their record is kept.</p><button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
+    inner = `<h3>${tName}</h3><p class="note block">${pr ? (pr.minutes ? `${tName} is asking for ${fmtDur(pr.minutes)}.` : `${tName} is asking for time.`) : `${tName} has not asked. You can still give time.`}<br><span style="color:var(--w60)">${S.weekRequests[t]} requests this week.${b && b.bgEndsAt ? ` Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}.` : ''}</span></p><div class="sectiontitle">GIVE TIME</div><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="${run('timed', m)}"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}${customRow(u, 'Give', run('timed', 'MINUTES').replace(/\}\)$/, ';S.ui[\'' + u + '\'].custom.open=false})'))}</div><div class="list"><div class="item danger" onclick="${run('end', 'null')}">End their block</div>${pr ? `<div class="item" onclick="${run('denied', 'null')}">Say no</div>` : ''}</div><p class="note">Ending the block resets their streak. Their record is kept.</p><button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
   } else if (ui.sheet === 'breakglass') {
     const b = activeBlock(u); const hrs = b ? b.coolingOff : 24; const ends = now() + hrs * 3600e3;
     const mutual = S.keys.some(k => k.status === 'active' && k.holder === u && k.locked === h) && !!activeBlock(h);

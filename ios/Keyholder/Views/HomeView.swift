@@ -179,7 +179,7 @@ struct HeroView: View {
     private func actions(_ block: Block) -> some View {
         HStack(spacing: 10) {
             if let pending = snapshot.myPendingRequest {
-                Text(pending.requestedMinutes.map { "Asked \(holderName) for \($0) min. Waiting…" } ?? "Asked \(holderName). Waiting…")
+                Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.white60)
             } else {
@@ -326,7 +326,7 @@ struct HeldKeyRow: View {
                         .padding(.top, 4)
 
                     if let request = held.pendingRequest {
-                        Text(request.requestedMinutes.map { "Asking for \($0) min" } ?? "Asking for time")
+                        Text(request.requestedMinutes.map { "Asking for \(UnlockDuration.format(minutes: $0))" } ?? "Asking for time")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                             .padding(.top, 10)
