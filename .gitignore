@@ -11,3 +11,6 @@ supabase/.temp/
 supabase/.branches/
 # Archives
 *.tar.gz
+
+# Claude Code personal settings
+.claude/settings.local.json
