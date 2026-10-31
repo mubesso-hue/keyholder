@@ -260,6 +260,7 @@ struct HeroView: View {
             .tracking(-1)
             .foregroundStyle(.white)
             .fixedSize(horizontal: false, vertical: true)
+            .legibleOnPhoto()
     }
 
     private func subline(_ text: String) -> some View {
@@ -267,6 +268,7 @@ struct HeroView: View {
             .font(Theme.sub)
             .foregroundStyle(Theme.white60)
             .padding(.top, 12)
+            .legibleOnPhoto()
     }
 
     private func helper(_ text: String, warn: Bool = false) -> some View {
@@ -274,6 +276,7 @@ struct HeroView: View {
             .font(Theme.helper)
             .foregroundStyle(warn ? Theme.orangeLight : Theme.white60)
             .fixedSize(horizontal: false, vertical: true)
+            .legibleOnPhoto()
     }
 }
 

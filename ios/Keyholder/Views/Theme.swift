@@ -89,6 +89,15 @@ struct GlassPillStyle: ButtonStyle {
     }
 }
 
+extension View {
+    /// Soft shadow so white type stays readable over bright scenery.
+    func legibleOnPhoto() -> some View {
+        self
+            .shadow(color: .black.opacity(0.55), radius: 12, y: 2)
+            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+    }
+}
+
 /// Shrinks slightly while pressed. Used by the hero Lock button.
 struct PressScaleStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {

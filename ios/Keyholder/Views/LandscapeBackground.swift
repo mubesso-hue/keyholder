@@ -45,21 +45,21 @@ struct LandscapeBackground: View {
         .ignoresSafeArea()
     }
 
-    /// Darkens the top for the header, the bottom for the apps and record, and
-    /// lightly everywhere so white type stays readable on bright scenes.
+    /// Light touch so the scenery stays visible: a short dark strip behind the
+    /// header and a gradient behind the record and the bottom edge. Type gets
+    /// its own soft shadow in HeroView.
     @ViewBuilder
     private func photoOverlays(size: CGSize) -> some View {
-        Theme.ink.opacity(0.22)
         VStack(spacing: 0) {
-            LinearGradient(colors: [Theme.ink.opacity(0.75), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: size.height * 0.28)
+            LinearGradient(colors: [Theme.ink.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
+                .frame(height: size.height * 0.22)
             Spacer()
             LinearGradient(stops: [
                 .init(color: .clear, location: 0),
-                .init(color: Theme.ink.opacity(0.7), location: 0.5),
-                .init(color: Theme.ink.opacity(0.96), location: 1),
+                .init(color: Theme.ink.opacity(0.55), location: 0.52),
+                .init(color: Theme.ink.opacity(0.9), location: 1),
             ], startPoint: .top, endPoint: .bottom)
-            .frame(height: size.height * 0.48)
+            .frame(height: size.height * 0.42)
         }
         .frame(width: size.width, height: size.height)
     }

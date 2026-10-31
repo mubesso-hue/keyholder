@@ -67,6 +67,7 @@ struct SessionRing: View {
                 TrackedLabel(text: label, color: labelIsOrange ? Theme.orangeMid : Theme.white40)
             }
             .padding(.horizontal, 14)
+            .legibleOnPhoto()
         }
         .frame(width: size, height: size)
         .shadow(color: Theme.orangeMid.opacity(0.14), radius: 30)
@@ -85,5 +86,6 @@ struct RecordStat: View {
                 .foregroundStyle(.white)
             TrackedLabel(text: "RECORD")
         }
+        .legibleOnPhoto()
     }
 }
