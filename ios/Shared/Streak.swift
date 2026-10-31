@@ -37,6 +37,17 @@ struct StreakState: Codable, Equatable {
         return true
     }
 
+    /// Session timer: "03:00:12", or "1d 03:00" past a day.
+    static func clock(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded(.down))
+        let days = total / 86_400
+        let hours = (total % 86_400) / 3_600
+        let minutes = (total % 3_600) / 60
+        let secs = total % 60
+        if days > 0 { return String(format: "%dd %02d:%02d", days, hours, minutes) }
+        return String(format: "%02d:%02d:%02d", hours, minutes, secs)
+    }
+
     /// "3d 14h", "14h 05m", "12m"
     static func format(_ seconds: Double) -> String {
         let total = Int(seconds.rounded(.down))

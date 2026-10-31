@@ -1,38 +1,45 @@
 import SwiftUI
 
+/// Main screen. Full-bleed landscape, one big Lock, everything else steps back.
 struct HomeView: View {
     @EnvironmentObject private var state: AppState
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let snapshot = state.snapshot {
-                        MyCardView(snapshot: snapshot)
+            ZStack {
+                LandscapeBackground()
 
-                        if !snapshot.held.isEmpty {
-                            Text("Keys you hold")
-                                .font(.headline)
-                                .padding(.top, 8)
-                            ForEach(snapshot.held) { held in
-                                HeldKeyCardView(held: held)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        header
+
+                        if let snapshot = state.snapshot {
+                            HeroView(snapshot: snapshot, compact: !snapshot.held.isEmpty)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 18)
+
+                            if !snapshot.held.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    TrackedLabel(text: "KEYS YOU HOLD")
+                                    ForEach(snapshot.held) { held in
+                                        HeldKeyRow(held: held)
+                                    }
+                                }
+                                .padding(.top, 22)
                             }
-                        }
 
-                        inviteButtons
-                    } else {
-                        ProgressView().frame(maxWidth: .infinity).padding(.top, 80)
+                            footerLinks
+                                .padding(.top, 28)
+                                .padding(.bottom, 24)
+                        } else {
+                            ProgressView().tint(.white).padding(.top, 120)
+                        }
                     }
+                    .padding(.horizontal, 24)
                 }
-                .padding()
+                .scrollIndicators(.hidden)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Keyholder")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { state.sheet = .settings } label: { Image(systemName: "gearshape") }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await state.refresh() }
             .sheet(item: $state.sheet) { sheet in
                 switch sheet {
@@ -46,99 +53,133 @@ struct HomeView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 
-    private var inviteButtons: some View {
-        HStack(spacing: 12) {
-            Button { state.sheet = .invite } label: {
-                Label("Invite someone", systemImage: "person.badge.plus").frame(maxWidth: .infinity)
+    private var header: some View {
+        HStack {
+            Text("Keyholder")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Theme.white60)
+            Spacer()
+            Button { state.sheet = .settings } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 21, weight: .light))
+                    .foregroundStyle(Theme.white60)
             }
-            .buttonStyle(.bordered)
-            Button { state.sheet = .accept(code: nil) } label: {
-                Label("Enter a code", systemImage: "number").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
+            .accessibilityLabel("Settings")
         }
-        .padding(.top, 8)
+        .padding(.top, 10)
+    }
+
+    private var footerLinks: some View {
+        HStack(spacing: 10) {
+            Button("Invite someone") { state.sheet = .invite }
+            Text("·")
+            Button("Enter a code") { state.sheet = .accept(code: nil) }
+        }
+        .font(.system(size: 13, weight: .medium))
+        .foregroundStyle(Theme.white40)
+        .frame(maxWidth: .infinity)
     }
 }
 
-// MARK: - My card
+// MARK: - Hero
 
-struct MyCardView: View {
+struct HeroView: View {
     @EnvironmentObject private var state: AppState
     let snapshot: Snapshot
+    var compact = false
+
+    private var holderName: String { snapshot.keyholder?.profile.displayName ?? "your keyholder" }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(spacing: 0) {
             if let block = snapshot.block, block.isActive {
-                activeBlock(block)
-            } else if let keyholder = snapshot.keyholder {
-                readyToLock(keyholder)
+                locked(block)
+            } else if snapshot.keyholder != nil {
+                readyToLock
             } else {
                 noKeyholder
             }
         }
-        .card()
+        .multilineTextAlignment(.center)
     }
 
-    // Locked --------------------------------------------------------------------
+    // Locked ------------------------------------------------------------------
 
     @ViewBuilder
-    private func activeBlock(_ block: Block) -> some View {
-        let holderName = snapshot.keyholder?.profile.displayName ?? "your keyholder"
+    private func locked(_ block: Block) -> some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let now = context.date.addingTimeInterval(state.clockOffset)
+            let unlocked = block.isTemporarilyUnlocked(at: now)
+            let paused = snapshot.streak.isPaused(at: now)
+            let seconds = snapshot.streak.currentSeconds(at: now)
 
-        HStack {
-            statusLabel(block, holderName: holderName)
-            Spacer()
-            if !block.verified {
-                Label("unverified", systemImage: "questionmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+            VStack(spacing: 0) {
+                headline(unlocked ? "Back in a moment." : "Phone down.\nLook up.")
+                subline(unlocked ? "Unlocked until \(block.unlockUntil?.shortTime ?? "")." : "\(holderName) holds the key.")
+
+                if !block.verified {
+                    TrackedLabel(text: "UNVERIFIED · PHONE QUIET", color: Theme.orangeLight).padding(.top, 8)
+                }
+
+                SessionRing(seconds: seconds,
+                            label: unlocked ? (paused ? "PAUSED" : "OPEN") : "LOCKED",
+                            labelIsOrange: !unlocked,
+                            dim: unlocked,
+                            size: compact ? 160 : 200)
+                    .padding(.top, compact ? 22 : (block.isBreakingGlass ? 22 : 34))
+                    .padding(.bottom, compact ? 16 : (block.isBreakingGlass ? 14 : 26))
+
+                if let endsAt = block.breakGlassEndsAt {
+                    breakGlassPanel(endsAt: endsAt, now: now)
+                        .padding(.top, 4)
+                }
+
+                actions(block)
+                    .padding(.top, 18)
+
+                RecordStat(seconds: max(snapshot.streak.bestSeconds, seconds))
+                    .padding(.top, block.isBreakingGlass ? 18 : 26)
             }
         }
+    }
 
-        StreakView(streak: snapshot.streak, offset: state.clockOffset)
-
-        Text("\(block.appCount) apps, \(block.categoryCount) categories blocked. \(holderName) holds the key.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-
-        if let endsAt = block.breakGlassEndsAt {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                    Countdown(until: endsAt, offset: state.clockOffset, prefix: "Break Glass ends in ")
-                        .font(.subheadline.weight(.semibold))
-                }
-                Text("Your streak resets when it completes. Cancel any time before \(endsAt.shortDateTime) to keep it.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                Button("Cancel Break Glass") {
-                    Task { await state.cancelBreakGlass() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(state.busy)
-            }
-            .padding(12)
-            .background(Color.red.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-        }
-
-        HStack(spacing: 12) {
-            if let pending = snapshot.myPendingRequest {
-                Label(pendingLabel(pending, holderName: holderName), systemImage: "hourglass")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+    private func breakGlassPanel(endsAt: Date, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Break Glass ends in \(StreakState.format(max(0, endsAt.timeIntervalSince(now))))")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
                 Spacer()
+                Button("Cancel") { Task { await state.cancelBreakGlass() } }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.orangeLight)
+                    .disabled(state.busy)
+            }
+            Text("Your streak resets when it completes. Cancel any time before \(endsAt.shortDateTime) to keep it.")
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.white60)
+                .multilineTextAlignment(.leading)
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glass()
+    }
+
+    @ViewBuilder
+    private func actions(_ block: Block) -> some View {
+        HStack(spacing: 10) {
+            if let pending = snapshot.myPendingRequest {
+                Text(pending.requestedMinutes.map { "Asked \(holderName) for \($0) min. Waiting…" } ?? "Asked \(holderName). Waiting…")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.white60)
             } else {
-                Button {
-                    state.sheet = .request
-                } label: {
-                    Label("Ask \(holderName) for time", systemImage: "hand.raised").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(state.busy)
+                Button("Ask \(holderName) for time") { state.sheet = .request }
+                    .buttonStyle(GlassPillStyle())
+                    .disabled(state.busy)
             }
 
             if block.breakGlassEndsAt == nil {
@@ -147,165 +188,187 @@ struct MyCardView: View {
                         Label("Break Glass…", systemImage: "exclamationmark.triangle")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle").font(.title2)
+                    Text("···")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 46, height: 46)
+                        .background {
+                            Circle().fill(.ultraThinMaterial)
+                                .overlay(Circle().fill(Theme.white08))
+                                .overlay(Circle().stroke(Theme.white15, lineWidth: 1))
+                        }
                 }
+                .accessibilityLabel("More")
             }
         }
     }
 
-    private func statusLabel(_ block: Block, holderName: String) -> some View {
-        Group {
-            if let until = block.unlockUntil, until > state.serverNow {
-                Label("Unlocked until \(until.shortTime)", systemImage: "lock.open.fill")
-                    .foregroundStyle(.green)
-            } else {
-                Label("Locked", systemImage: "lock.fill")
-            }
-        }
-        .font(.headline)
-    }
-
-    private func pendingLabel(_ request: UnlockRequest, holderName: String) -> String {
-        if let minutes = request.requestedMinutes {
-            return "Asked \(holderName) for \(minutes) min. Waiting…"
-        }
-        return "Asked \(holderName). Waiting…"
-    }
-
-    // Ready to lock ------------------------------------------------------------
+    // Ready to lock -----------------------------------------------------------
 
     @ViewBuilder
-    private func readyToLock(_ keyholder: Keyholder) -> some View {
-        Label("\(keyholder.profile.displayName) holds your key", systemImage: "key.fill")
-            .font(.headline)
+    private var readyToLock: some View {
+        headline("Be here now.")
+        subline("\(holderName) holds your key.")
+
+        LockButton(size: compact ? 132 : 176) { state.sheet = .lock }
+            .padding(.top, compact ? 22 : 34)
+            .padding(.bottom, compact ? 16 : 26)
 
         if snapshot.streak.isOnGrace, let graceUntil = snapshot.streak.graceUntil {
-            VStack(alignment: .leading, spacing: 4) {
-                StreakView(streak: snapshot.streak, offset: state.clockOffset, compact: true)
-                Text("Streak paused. Lock again before \(graceUntil.shortDateTime) to keep it.")
-                    .font(.footnote)
-                    .foregroundStyle(.orange)
-            }
+            helper("Streak paused at \(StreakState.format(snapshot.streak.currentSeconds())). Lock before \(graceUntil.shortDateTime) to keep it.", warn: true)
         } else {
-            Text("Record \(StreakState.format(snapshot.streak.bestSeconds))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            helper("Once locked, only \(holderName) can give you time.")
         }
 
-        Button {
-            state.sheet = .lock
-        } label: {
-            Label("Lock", systemImage: "lock.fill").frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-
-        Text("Once locked, only \(keyholder.profile.displayName) can give you time.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+        RecordStat(seconds: max(snapshot.streak.bestSeconds, snapshot.streak.currentSeconds()))
+            .padding(.top, compact ? 16 : 26)
     }
 
-    // No keyholder -------------------------------------------------------------
+    // No keyholder ------------------------------------------------------------
 
     @ViewBuilder
     private var noKeyholder: some View {
-        Label("Nobody holds your key yet", systemImage: "key")
-            .font(.headline)
-        Text("Invite a friend to hold your key, or enter the code they sent you. You cannot lock until someone can unlock you.")
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+        headline("Nobody holds your key yet.")
+        subline("Invite a friend, or enter their code.")
+
+        LockButton(enabled: false, size: compact ? 132 : 176) {}
+            .padding(.top, compact ? 22 : 34)
+            .padding(.bottom, compact ? 16 : 26)
+
         if snapshot.streak.isOnGrace, let graceUntil = snapshot.streak.graceUntil {
-            // Orphaned by a partner's Break Glass: the streak survives for a day.
-            StreakView(streak: snapshot.streak, offset: state.clockOffset, compact: true)
-            Text("Streak paused. Find a new keyholder and lock before \(graceUntil.shortDateTime) to keep it.")
-                .font(.footnote)
-                .foregroundStyle(.orange)
-        } else if snapshot.streak.bestSeconds > 0 {
-            Text("Record \(StreakState.format(snapshot.streak.bestSeconds))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            helper("Streak paused at \(StreakState.format(snapshot.streak.currentSeconds())). Find a keyholder and lock before \(graceUntil.shortDateTime) to keep it.", warn: true)
+        } else {
+            helper("You cannot lock until someone can unlock you.")
         }
+
+        HStack(spacing: 10) {
+            Button("Invite someone") { state.sheet = .invite }
+            Button("Enter a code") { state.sheet = .accept(code: nil) }
+        }
+        .buttonStyle(GlassPillStyle())
+        .padding(.top, 18)
+
+        RecordStat(seconds: snapshot.streak.bestSeconds)
+            .padding(.top, compact ? 16 : 26)
+    }
+
+    // Pieces -------------------------------------------------------------------
+
+    private func headline(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.headline(compact ? 36 : 46))
+            .tracking(-1)
+            .foregroundStyle(.white)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func subline(_ text: String) -> some View {
+        Text(text)
+            .font(Theme.sub)
+            .foregroundStyle(Theme.white60)
+            .padding(.top, 12)
+    }
+
+    private func helper(_ text: String, warn: Bool = false) -> some View {
+        Text(text)
+            .font(Theme.helper)
+            .foregroundStyle(warn ? Theme.orangeLight : Theme.white60)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 // MARK: - Someone whose key I hold
 
-struct HeldKeyCardView: View {
+struct HeldKeyRow: View {
     @EnvironmentObject private var state: AppState
     let held: HeldKey
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(held.profile.displayName).font(.headline)
-                Spacer()
-                status
-            }
-
-            if let block = held.block, block.isActive {
-                if let streak = held.streak {
-                    StreakView(streak: streak, offset: state.clockOffset, compact: true)
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let now = context.date.addingTimeInterval(state.clockOffset)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(held.profile.displayName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    status(now: now)
                 }
-                Text("\(block.appCount) apps, \(block.categoryCount) categories. \(held.requestsThisWeek) requests this week.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
 
-                if let endsAt = block.breakGlassEndsAt {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                        Countdown(until: endsAt, offset: state.clockOffset, prefix: "Broke the glass. Block ends in ")
-                            .font(.subheadline.weight(.semibold))
+                if let block = held.block, block.isActive {
+                    let seconds = held.streak?.currentSeconds(at: now) ?? 0
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(StreakState.clock(seconds))
+                            .font(.system(size: 24, weight: .light))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                        Spacer()
+                        TrackedLabel(text: "RECORD \(StreakState.format(max(held.streak?.bestSeconds ?? 0, seconds)))")
                     }
-                }
+                    .padding(.top, 8)
 
-                if let request = held.pendingRequest {
-                    VStack(alignment: .leading, spacing: 8) {
+                    Text(metaLine(block, now: now))
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.white60)
+                        .padding(.top, 4)
+
+                    if let request = held.pendingRequest {
                         Text(request.requestedMinutes.map { "Asking for \($0) min" } ?? "Asking for time")
-                            .font(.subheadline.weight(.semibold))
-                        HStack(spacing: 8) {
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.top, 10)
+                        HStack(spacing: 6) {
                             Button("15 min") { Task { await state.decide(request, decision: .approvedTimed, duration: .minutes(15)) } }
                             Button("1 hour") { Task { await state.decide(request, decision: .approvedTimed, duration: .minutes(60)) } }
                             Button("More…") { state.sheet = .decide(held) }
-                            Spacer()
-                            Button("No", role: .destructive) { Task { await state.decide(request, decision: .denied) } }
+                            Button("No") { Task { await state.decide(request, decision: .denied) } }
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(GlassPillStyle(compact: true))
                         .disabled(state.busy)
+                        .padding(.top, 10)
+                    } else {
+                        Button("Give time…") { state.sheet = .decide(held) }
+                            .buttonStyle(GlassPillStyle(compact: true))
+                            .disabled(state.busy)
+                            .padding(.top, 10)
                     }
-                    .padding(12)
-                    .background(Color.accentColor.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Button("Give time…") { state.sheet = .decide(held) }
-                        .buttonStyle(.bordered)
-                        .disabled(state.busy)
-                }
-            } else {
-                Text("Not locked right now.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if let streak = held.streak, streak.bestSeconds > 0 {
+                } else if let streak = held.streak, streak.bestSeconds > 0 {
                     Text("Record \(StreakState.format(streak.bestSeconds))")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Theme.white60)
+                        .padding(.top, 4)
                 }
             }
+            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glass()
         }
-        .card()
     }
 
     @ViewBuilder
-    private var status: some View {
+    private func status(now: Date) -> some View {
         if let block = held.block, block.isActive {
-            if let until = block.unlockUntil, until > state.serverNow {
-                Label("Unlocked until \(until.shortTime)", systemImage: "lock.open.fill")
-                    .font(.caption).foregroundStyle(.green)
-            } else if !block.verified {
-                Label("quiet", systemImage: "questionmark.circle")
-                    .font(.caption).foregroundStyle(.orange)
+            if block.isTemporarilyUnlocked(at: now), let until = block.unlockUntil {
+                Text("Unlocked until \(until.shortTime)")
+                    .font(.system(size: 12)).foregroundStyle(Theme.white60)
             } else {
-                Label("Locked", systemImage: "lock.fill").font(.caption)
+                HStack(spacing: 6) {
+                    Circle().fill(Theme.orangeGradient).frame(width: 6, height: 6)
+                    Text(block.verified ? "Locked" : "Locked · quiet")
+                        .font(.system(size: 12)).foregroundStyle(Theme.white60)
+                }
             }
+        } else {
+            Text("Not locked").font(.system(size: 12)).foregroundStyle(Theme.white60)
         }
+    }
+
+    private func metaLine(_ block: Block, now: Date) -> String {
+        var parts = ["\(block.appCount) apps, \(block.categoryCount) categories", "\(held.requestsThisWeek) requests this week"]
+        if let endsAt = block.breakGlassEndsAt {
+            parts.append("Broke the glass, ends in \(StreakState.format(max(0, endsAt.timeIntervalSince(now))))")
+        }
+        return parts.joined(separator: " · ")
     }
 }
