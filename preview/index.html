@@ -205,7 +205,7 @@
 </div>
 
 <div class="legend">
-  <b>Things to try:</b> tap Instagram on Marc's phone before and after locking · ask for time from the shield, approve from Sarah's notification · give time unasked from Sarah's list · Break Glass, then cancel · Break Glass and jump +24 hours (with mutual pact on, watch Sarah's block lift and her streak go on grace).
+  <b>Things to try:</b> tap Instagram on Marc's phone before and after locking · ask for time from the shield, approve from Sarah's notification · give time unasked from Sarah's list · change apps from Marc's ··· menu: blocking one more is instant, keeping one more open goes to Sarah · Break Glass, then cancel · Break Glass and jump +24 hours (with mutual pact on, watch Sarah's block lift and her streak go on grace).
   <br>This page simulates the product rules. It is not the iOS build; Screen Time blocking, push notifications and Sign in with Apple only exist on a real device.
 </div>
 
@@ -236,6 +236,7 @@ function resetAll() {
     blocks: {},
     streaks: { marc: newStreak(), sarah: newStreak() },
     requests: [],
+    appChanges: [],
     notifs: { marc: [], sarah: [] },
     ui: { marc: newUI(), sarah: newUI() },
     askedAt: { marc: null, sarah: null },
@@ -287,6 +288,7 @@ const heldBy = (h) => S.keys.filter(k => k.holder === h && k.status === 'active'
 const activeBlock = (u) => (S.blocks[u] && S.blocks[u].status === 'active') ? S.blocks[u] : null;
 const isShielded = (u) => { const b = activeBlock(u); return !!b && !(b.unlockUntil && b.unlockUntil > now()); };
 const pendingRequest = (u) => S.requests.find(r => r.from === u && r.status === 'pending') ?? null;
+const pendingAppChange = (u) => S.appChanges.find(c => c.from === u && c.status === 'pending') ?? null;
 function notify(to, title, body, category, data = {}) { S.notifs[to].unshift({ id: Math.random(), title, body, category, data, at: now() }); S.notifs[to] = S.notifs[to].slice(0, 3); }
 
 // mode 'allExcept': every app except the allowed ones is blocked (mirrors start_block p_mode).
@@ -306,6 +308,7 @@ function endBlock(u, reason) {
   const b = activeBlock(u); if (!b) return;
   b.status = 'ended'; b.reason = reason; b.unlockUntil = null; b.bgEndsAt = null;
   S.requests.forEach(r => { if (r.from === u && r.status === 'pending') r.status = 'cancelled'; });
+  S.appChanges.forEach(c => { if (c.from === u && c.status === 'pending') c.status = 'cancelled'; });
   S.askedAt[u] = null;
 }
 function requestUnlock(u, minutes, source) {
@@ -314,7 +317,7 @@ function requestUnlock(u, minutes, source) {
   const h = holderOf(u);
   S.requests.push({ id: Math.random(), from: u, to: h, minutes, status: 'pending', at: now() });
   S.weekRequests[u]++;
-  notify(h, `${USERS[u].name} is asking for time`, minutes ? `They are asking for ${minutes} minutes.` : 'They want to be unlocked.', 'UNLOCK_REQUEST', { from: u });
+  notify(h, `${USERS[u].name} is asking for time`, minutes ? `They are asking for ${fmtDur(minutes)}.` : 'They want to be unlocked.', 'UNLOCK_REQUEST', { from: u });
 }
 function applyDecision(req, decision, minutes) {
   const u = req.from, hName = USERS[req.to].name, b = activeBlock(u);
@@ -322,7 +325,7 @@ function applyDecision(req, decision, minutes) {
   else if (decision === 'timed') {
     req.status = 'approved'; const until = now() + minutes * 60e3; b.unlockUntil = until; streakPause(u, until);
     S.askedAt[u] = null;
-    notify(u, `${hName} unlocked you`, `You have ${minutes} minutes. The block comes back on its own.`, 'UNLOCK_DECIDED');
+    notify(u, `${hName} unlocked you`, `You have ${fmtDur(minutes)}. The block comes back on its own.`, 'UNLOCK_DECIDED');
   } else if (decision === 'end') {
     req.status = 'approved'; endBlock(u, 'holder_ended'); streakReset(u);
     notify(u, `${hName} ended your block`, 'Your streak reset. Lock again whenever you want.', 'BLOCK_ENDED');
@@ -335,6 +338,55 @@ function holderUnlock(h, u, decision, minutes) {
   if (!r) { r = { id: Math.random(), from: u, to: h, minutes: null, status: 'pending', at: now() }; S.requests.push(r); }
   applyDecision(r, decision, minutes);
 }
+// Changing apps while locked (mirrors migration 0005). Stricter applies now;
+// opening apps up is a request the keyholder answers. b.apps is what's blocked.
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const changeText = (mode, n) => mode === 'allExcept' ? `keep ${n} more ${n === 1 ? 'app' : 'apps'} open` : `unblock ${plural(n, 'app', 'apps')}`;
+const sameSet = (a, b) => a.size === b.size && [...a].every(x => b.has(x));
+// The editor works in the mode's own terms: what stays open, or what is blocked.
+// A pending change is shown as if approved.
+function editorStart(u) {
+  const b = activeBlock(u), pc = pendingAppChange(u), blocked = new Set(b.apps);
+  if (pc) pc.opened.forEach(id => blocked.delete(id));
+  return b.mode === 'allExcept' ? new Set(APPS.map(a => a.id).filter(id => !blocked.has(id))) : blocked;
+}
+function appPlan(u) {
+  const b = activeBlock(u), d = S.ui[u].editDraft;
+  const next = b.mode === 'allExcept' ? new Set(APPS.map(a => a.id).filter(id => !d.has(id))) : new Set(d);
+  return { closed: [...next].filter(id => !b.apps.has(id)), opened: [...b.apps].filter(id => !next.has(id)) };
+}
+function syncAllowed(b) { if (b.mode === 'allExcept') b.allowedCount = APPS.length - b.apps.size; }
+function saveAppChange(u) {
+  const b = activeBlock(u); if (!b) return;
+  const { closed, opened } = appPlan(u), h = holderOf(u), pc = pendingAppChange(u);
+  closed.forEach(id => b.apps.add(id)); syncAllowed(b);
+  const same = pc && sameSet(pc.opened, new Set(opened));
+  if (opened.length && !same) {
+    if (pc) pc.status = 'cancelled';
+    const c = { id: Math.random(), from: u, to: h, opened: new Set(opened), status: 'pending', text: changeText(b.mode, opened.length), at: now() };
+    S.appChanges.push(c);
+    notify(h, `${USERS[u].name} wants to change their blocked apps`, `They are asking to ${c.text}.`, 'APP_CHANGE_REQUEST', { from: u });
+  } else if (!opened.length && pc) pc.status = 'cancelled';
+  const parts = [];
+  if (closed.length) parts.push(`${plural(closed.length, 'app', 'apps')} blocked now`);
+  if (opened.length && !same) parts.push(`asked ${USERS[h].name}`);
+  if (!opened.length && pc) parts.push('request withdrawn');
+  toast(u, parts.join(' · ') || 'Saved');
+}
+function withdrawAppChange(u) { const pc = pendingAppChange(u); if (pc) pc.status = 'cancelled'; }
+function decideAppChange(id, approve) {
+  const c = S.appChanges.find(x => x.id === id); if (!c || c.status !== 'pending') return;
+  const b = activeBlock(c.from); if (!b) { c.status = 'cancelled'; return; }
+  const hName = USERS[c.to].name;
+  if (approve) {
+    c.status = 'approved'; c.opened.forEach(x => b.apps.delete(x)); syncAllowed(b);
+    notify(c.from, `${hName} approved your app change`, 'Your apps are updated.', 'APP_CHANGE_DECIDED');
+  } else {
+    c.status = 'denied';
+    notify(c.from, `${hName} said no to your app change`, 'Your blocked apps stay as they were.', 'APP_CHANGE_DECIDED');
+  }
+}
+
 function startBreakGlass(u) {
   const b = activeBlock(u); if (!b || b.bgEndsAt) return;
   b.bgEndsAt = now() + b.coolingOff * 3600e3;
@@ -393,6 +445,7 @@ function tapApp(u, id) {
   else toast(u, `${APPS.find(a => a.id === id).name} opened`);
 }
 function pressLock(u) { haptic(); openSheet(u, 'lock', { lockStep: 0 }); }
+function toggleEdit(u, id) { const s = S.ui[u].editDraft; s.has(id) ? s.delete(id) : s.add(id); render(); }
 function toggleAllowed(u, id) { const s = S.ui[u].allowed; s.has(id) ? s.delete(id) : s.add(id); render(); }
 function setCustom(u, k, v) { S.ui[u].custom[k] = Number(v); render(); }
 function customRow(u, verb, goCode) {
@@ -491,8 +544,10 @@ function hero(u) {
     html += `<div class="actions">`;
     if (pr) html += `<span class="waiting">Asked ${hName}${pr.minutes ? ` for ${fmtDur(pr.minutes)}` : ''}. Waiting…</span>`;
     else html += `<button class="pill" onclick="openSheet('${u}','request')">Ask ${hName} for time</button>`;
-    if (!b.bgEndsAt) html += `<button class="pill icon" title="Break Glass" onclick="openSheet('${u}','breakglass')">···</button>`;
+    html += `<button class="pill icon" title="More" onclick="openSheet('${u}','more')">···</button>`;
     html += `</div>`;
+    const pc = pendingAppChange(u);
+    if (pc) html += `<p class="helper" style="margin-top:12px">Waiting for ${hName} to OK your app change: ${pc.text}.</p>`;
     html += recordStat(s);
     return html;
   }
@@ -526,6 +581,10 @@ function heldRow(h, u) {
   if (b) {
     html += `<div class="meta"><span class="t">${clock(streakSeconds(s))}</span><span class="r">RECORD ${fmt(Math.max(s.best, streakSeconds(s)))}</span></div>`;
     html += `<div class="small">${blockSummary(b)} · ${S.weekRequests[u]} requests this week${b.bgEndsAt ? ` · Broke the glass, ends in ${fmt((b.bgEndsAt - now()) / 1000)}` : ''}</div>`;
+    const pc = pendingAppChange(u);
+    if (pc) {
+      html += `<div class="ask">Wants to ${pc.text}</div><div class="mini"><button class="pill" onclick="act(()=>decideAppChange(${JSON.stringify(pc.id)},true))">Approve</button><button class="pill" onclick="act(()=>decideAppChange(${JSON.stringify(pc.id)},false))">No</button></div>`;
+    }
     if (pr) {
       html += `<div class="ask">${pr.minutes ? `Asking for ${fmtDur(pr.minutes)}` : 'Asking for time'}</div><div class="mini"><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',15))">15 min</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',60))">1 hour</button><button class="pill" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">More…</button><button class="pill" onclick="act(()=>decide(${JSON.stringify(pr.id)},'denied'))">No</button></div>`;
     } else {
@@ -550,8 +609,8 @@ function sheet(u) {
   const ui = S.ui[u], h = holderOf(u), hName = h ? USERS[h].name : 'your keyholder';
   if (!ui.sheet) return '';
   let inner = '';
+  const appItem = (a, on, toggle, tag = '') => `<div class="item" onclick="${toggle}('${u}','${a.id}')"><span style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;display:inline-flex">${brandMark(a.id)}</span>${a.name}</span><span class="m" style="display:flex;align-items:center;gap:10px">${tag}${on ? '<span style="color:#FFB347">●</span>' : '○'}</span></div>`;
   if (ui.sheet === 'lock') {
-    const appItem = (a, on, toggle) => `<div class="item" onclick="${toggle}('${u}','${a.id}')"><span style="display:flex;align-items:center;gap:12px"><span style="width:20px;height:20px;display:inline-flex">${brandMark(a.id)}</span>${a.name}</span><span class="m">${on ? '<span style="color:#FFB347">●</span>' : '○'}</span></div>`;
     const modeItem = (mode, title, detail, badge) => `<div class="item" onclick="S.ui['${u}'].mode='${mode}';render()" style="align-items:flex-start;gap:12px"><span style="margin-top:2px;color:${ui.mode === mode ? '#FF7A00' : 'var(--w40)'}">${ui.mode === mode ? '●' : '○'}</span><span style="flex:1"><span style="display:flex;gap:8px;align-items:center;font-weight:600">${title}${badge ? `<span style="font-size:11px;font-weight:600;color:#FF7A00;background:rgba(255,122,0,.16);border-radius:999px;padding:2px 7px">${badge}</span>` : ''}</span><span class="m" style="display:block;margin-top:3px;line-height:1.45">${detail}</span></span></div>`;
     if (ui.lockStep === 0) {
       inner = `<h3>How do you want to lock?</h3><div class="list">${modeItem('allExcept', 'Everything except essentials', 'Every app is blocked except the few you keep open, like Phone, Messages, Maps and your bank. Apps you install later are blocked too.', 'Recommended')}${modeItem('selected', 'Only the apps I pick', 'Choose the apps or categories to block, such as Social and Games.', '')}</div><p class="note">Apple keeps your choices on this phone. Keyholder never sees which apps they are.</p><button class="btn primary" onclick="S.ui['${u}'].lockStep=1;render()">${ui.mode === 'allExcept' ? 'Choose what stays open' : 'Choose apps to block'}</button><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
@@ -563,6 +622,25 @@ function sheet(u) {
     } else {
       inner = `<h3>Cooling-off</h3><p class="note">If you ever need out without ${hName}, Break Glass ends the block after a wait. Choose the wait now, while you mean it.</p><div class="seg">${[12, 24, 48, 72].map(x => `<button class="${ui.coolingOff === x ? 'on' : ''}" onclick="S.ui['${u}'].coolingOff=${x};render()">${x === 12 ? '12 h' : (x / 24) + (x > 24 ? ' days' : ' day')}</button>`).join('')}</div><p class="note">You can make it longer later, never shorter.<br>${hName} is told the moment you break the glass.<br>Cancel before it completes and your streak survives.</p><button class="btn primary" onclick="haptic();act(()=>{startBlock('${u}',S.ui['${u}'].coolingOff);S.ui['${u}'].sheet=null})">Lock</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=1;render()">Back</button>`;
     }
+  } else if (ui.sheet === 'more') {
+    const b = activeBlock(u);
+    inner = `<div class="list"><div class="item" onclick="openSheet('${u}','editapps',{editDraft: editorStart('${u}')})"><span>Change apps…</span><span class="m">›</span></div>${b && !b.bgEndsAt ? `<div class="item danger" onclick="openSheet('${u}','breakglass')">Break Glass…</div>` : ''}</div><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+  } else if (ui.sheet === 'editapps') {
+    const b = activeBlock(u);
+    if (!b) { ui.sheet = null; return ''; }
+    const allExcept = b.mode === 'allExcept', pc = pendingAppChange(u), d = ui.editDraft;
+    const { closed, opened } = appPlan(u), changed = !sameSet(editorStart(u), d);
+    const same = pc && sameSet(pc.opened, new Set(opened));
+    const list = allExcept ? APPS : APPS.filter(a => !NEVER_BLOCKED.has(a.id));
+    const tag = (id) => closed.includes(id) ? '<span style="font-size:11px;color:#FF7A00">blocks now</span>' : opened.includes(id) ? `<span style="font-size:11px;color:var(--w60)">needs ${hName}</span>` : '';
+    const lines = !changed ? ['Tap apps to change what is blocked.'] : [
+      ...(closed.length ? [`Blocked right away: ${plural(closed.length, 'app', 'apps')}`] : []),
+      ...(opened.length ? [`Needs ${hName}'s OK: ${plural(opened.length, 'app', 'apps')}`] : pc ? [`Your request to ${hName} will be withdrawn.`] : []),
+    ];
+    const btn = !opened.length || same ? 'Save' : (pc ? `Save and ask ${hName} again` : `Save and ask ${hName}`);
+    const header = allExcept ? `Removing an app from this list blocks it right away. Keeping more apps open needs ${hName}'s OK.` : `Blocking more apps works right away. Unblocking an app needs ${hName}'s OK.`;
+    const banner = pc ? `<div style="display:flex;gap:10px;align-items:flex-start;background:rgba(255,122,0,.12);border-radius:14px;padding:12px 14px;margin-bottom:12px"><span style="flex:1;font-size:13px;line-height:1.45"><b>Waiting for ${hName}</b><br><span style="color:var(--w60)">You asked to ${pc.text}. It's shown below as if approved.</span></span><button class="link" onclick="act(()=>{withdrawAppChange('${u}');S.ui['${u}'].sheet=null})">Withdraw</button></div>` : '';
+    inner = `<h3>${allExcept ? 'What stays open' : 'Apps to block'}</h3>${banner}<p class="note">${header}</p><div class="list">${list.map(a => appItem(a, d.has(a.id), 'toggleEdit', tag(a.id))).join('')}</div><p class="note">${lines.join('<br>')}</p><button class="btn primary" ${changed ? '' : 'disabled'} onclick="act(()=>{saveAppChange('${u}');S.ui['${u}'].sheet=null})">${btn}</button><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
   } else if (ui.sheet === 'request') {
     const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
     inner = `<h3>Ask ${hName}</h3><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="act(()=>{requestUnlock('${u}',${m},'app');S.ui['${u}'].sheet=null})"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}${customRow(u, 'Ask for', `act(()=>{requestUnlock('${u}',MINUTES,'app');S.ui['${u}'].sheet=null;S.ui['${u}'].custom.open=false})`)}</div><p class="note">This is a suggestion. ${hName} picks the actual duration, and the block comes back on its own when it ends.</p><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
@@ -570,7 +648,7 @@ function sheet(u) {
     const t = ui.decideFor, pr = pendingRequest(t), b = activeBlock(t), tName = USERS[t].name;
     const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
     const run = (dec, m) => `act(()=>{${pr ? `decide(${JSON.stringify(pr.id)},'${dec}',${m})` : `holderUnlock('${u}','${t}','${dec}',${m})`};S.ui['${u}'].sheet=null})`;
-    inner = `<h3>${tName}</h3><p class="note block">${pr ? (pr.minutes ? `${tName} is asking for ${fmtDur(pr.minutes)}.` : `${tName} is asking for time.`) : `${tName} has not asked. You can still give time.`}<br><span style="color:var(--w60)">${S.weekRequests[t]} requests this week.${b && b.bgEndsAt ? ` Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}.` : ''}</span></p><div class="sectiontitle">GIVE TIME</div><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="${run('timed', m)}"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}${customRow(u, 'Give', run('timed', 'MINUTES').replace(/\}\)$/, ';S.ui[\'' + u + '\'].custom.open=false})'))}</div><div class="list"><div class="item danger" onclick="${run('end', 'null')}">End their block</div>${pr ? `<div class="item" onclick="${run('denied', 'null')}">Say no</div>` : ''}</div><p class="note">Ending the block resets their streak. Their record is kept.</p><button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
+    inner = `<h3>${tName}</h3><p class="note block">${pr ? (pr.minutes ? `${tName} is asking for ${fmtDur(pr.minutes)}.` : `${tName} is asking for time.`) : `${tName} has not asked. You can still give time.`}<br><span style="color:var(--w60)">${S.weekRequests[t]} requests this week.${b && b.bgEndsAt ? ` Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}.` : ''}</span></p>${pendingAppChange(t) ? `<div class="sectiontitle">APP CHANGE</div><p class="note block">${tName} wants to ${pendingAppChange(t).text}.</p><div class="list"><div class="item" onclick="act(()=>{decideAppChange(${JSON.stringify(pendingAppChange(t).id)},true);S.ui['${u}'].sheet=null})">Approve</div><div class="item" onclick="act(()=>{decideAppChange(${JSON.stringify(pendingAppChange(t).id)},false);S.ui['${u}'].sheet=null})">Say no</div></div><p class="note">Apple keeps their apps private, so you see how many, not which. Blocking more never needs your OK.</p>` : ''}<div class="sectiontitle">GIVE TIME</div><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="${run('timed', m)}"><span>${l}</span><span class="m">${m} min</span></div>`).join('')}${customRow(u, 'Give', run('timed', 'MINUTES').replace(/\}\)$/, ';S.ui[\'' + u + '\'].custom.open=false})'))}</div><div class="list"><div class="item danger" onclick="${run('end', 'null')}">End their block</div>${pr ? `<div class="item" onclick="${run('denied', 'null')}">Say no</div>` : ''}</div><p class="note">Ending the block resets their streak. Their record is kept.</p><button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
   } else if (ui.sheet === 'breakglass') {
     const b = activeBlock(u); const hrs = b ? b.coolingOff : 24; const ends = now() + hrs * 3600e3;
     const mutual = S.keys.some(k => k.status === 'active' && k.holder === u && k.locked === h) && !!activeBlock(h);
@@ -591,7 +669,8 @@ function shieldView(u) {
 function banners(u) {
   return `<div class="banners">${S.notifs[u].map(n => {
     const req = n.category === 'UNLOCK_REQUEST' ? pendingRequest(n.data.from) : null;
-    return `<div class="banner"><span class="x" onclick="dismissNotif('${u}',${JSON.stringify(n.id)})">✕</span><div class="t">${esc(n.title)}</div><div class="b">${esc(n.body)}</div>${req ? `<div class="actions"><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',15));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 15 min</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',60));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 1 hour</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'denied'));dismissNotif('${u}',${JSON.stringify(n.id)})">Say no</button></div>` : ''}</div>`;
+    const chg = n.category === 'APP_CHANGE_REQUEST' ? pendingAppChange(n.data.from) : null;
+    return `<div class="banner"><span class="x" onclick="dismissNotif('${u}',${JSON.stringify(n.id)})">✕</span><div class="t">${esc(n.title)}</div><div class="b">${esc(n.body)}</div>${req ? `<div class="actions"><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',15));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 15 min</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',60));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 1 hour</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'denied'));dismissNotif('${u}',${JSON.stringify(n.id)})">Say no</button></div>` : ''}${chg ? `<div class="actions"><button onclick="act(()=>decideAppChange(${JSON.stringify(chg.id)},true));dismissNotif('${u}',${JSON.stringify(n.id)})">Approve</button><button onclick="act(()=>decideAppChange(${JSON.stringify(chg.id)},false));dismissNotif('${u}',${JSON.stringify(n.id)})">Say no</button></div>` : ''}</div>`;
   }).join('')}</div>`;
 }
 
