@@ -54,26 +54,29 @@ function apnsConfigured(): boolean {
   return ["APNS_TEAM_ID", "APNS_KEY_ID", "APNS_PRIVATE_KEY", "APNS_BUNDLE_ID"].every((k) => !!Deno.env.get(k));
 }
 
+const PRODUCTION = "https://api.push.apple.com";
+const SANDBOX = "https://api.sandbox.push.apple.com";
+
+// APNS_ENV picks which server to try first. Development builds (installed
+// from Xcode) only accept sandbox; TestFlight and App Store builds only accept
+// production. A token sent to the wrong one comes back BadDeviceToken, so we
+// retry on the other server. Both kinds of build get pushes from one backend.
+function apnsHosts(): [string, string] {
+  return Deno.env.get("APNS_ENV") === "production" ? [PRODUCTION, SANDBOX] : [SANDBOX, PRODUCTION];
+}
+
 function apnsHost(): string {
-  return Deno.env.get("APNS_ENV") === "production"
-    ? "https://api.push.apple.com"
-    : "https://api.sandbox.push.apple.com";
+  return apnsHosts()[0];
 }
 
 // Categories whose target device must act (drop or restore shields), so the
 // push also wakes the app in the background.
 const WAKES_APP = new Set(["UNLOCK_DECIDED", "BLOCK_ENDED", "KEY_ENDED"]);
 
-async function sendToDevice(token: string, n: NotificationRow): Promise<{ ok: boolean; status: number; reason?: string }> {
-  const aps: Record<string, unknown> = {
-    alert: { title: n.title, body: n.body },
-    sound: "default",
-    category: n.category,
-    "thread-id": n.category,
-  };
-  if (WAKES_APP.has(n.category)) aps["content-available"] = 1;
+type SendResult = { ok: boolean; status: number; reason?: string; host?: string };
 
-  const res = await fetch(`${apnsHost()}/3/device/${token}`, {
+async function postToApns(host: string, token: string, body: string): Promise<SendResult> {
+  const res = await fetch(`${host}/3/device/${token}`, {
     method: "POST",
     headers: {
       authorization: `bearer ${await apnsJwt()}`,
@@ -83,15 +86,30 @@ async function sendToDevice(token: string, n: NotificationRow): Promise<{ ok: bo
       "apns-expiration": "0",
       "content-type": "application/json",
     },
-    body: JSON.stringify({ aps, category: n.category, data: n.data ?? {}, notification_id: n.id }),
+    body,
   });
-
-  if (res.ok) return { ok: true, status: res.status };
+  if (res.ok) return { ok: true, status: res.status, host };
   let reason: string | undefined;
   try {
     reason = (await res.json())?.reason;
   } catch { /* no body */ }
-  return { ok: false, status: res.status, reason };
+  return { ok: false, status: res.status, reason, host };
+}
+
+async function sendToDevice(token: string, n: NotificationRow): Promise<SendResult> {
+  const aps: Record<string, unknown> = {
+    alert: { title: n.title, body: n.body },
+    sound: "default",
+    category: n.category,
+    "thread-id": n.category,
+  };
+  if (WAKES_APP.has(n.category)) aps["content-available"] = 1;
+  const body = JSON.stringify({ aps, category: n.category, data: n.data ?? {}, notification_id: n.id });
+
+  const [first, second] = apnsHosts();
+  const r = await postToApns(first, token, body);
+  if (r.ok || r.reason !== "BadDeviceToken") return r;
+  return await postToApns(second, token, body);
 }
 
 function extractId(payload: unknown): number | null {
