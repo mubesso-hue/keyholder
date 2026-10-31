@@ -117,8 +117,11 @@ struct HeroView: View {
             let seconds = snapshot.streak.currentSeconds(at: now)
 
             VStack(spacing: 0) {
-                headline(unlocked ? "Back in a moment." : "Phone down.\nLook up.")
-                subline(unlocked ? "Unlocked until \(block.unlockUntil?.shortTime ?? "")." : "\(holderName) holds the key.")
+                VStack(spacing: 0) {
+                    headline(unlocked ? "Back in a moment." : "Phone down.\nLook up.")
+                    subline(unlocked ? "Unlocked until \(block.unlockUntil?.shortTime ?? "")." : "\(holderName) holds the key.")
+                }
+                .scrim()
 
                 if !block.verified {
                     TrackedLabel(text: "UNVERIFIED · PHONE QUIET", color: Theme.orangeLight).padding(.top, 8)
@@ -207,8 +210,11 @@ struct HeroView: View {
 
     @ViewBuilder
     private var readyToLock: some View {
-        headline("Be here now.")
-        subline("\(holderName) holds your key.")
+        VStack(spacing: 0) {
+            headline("Be here now.")
+            subline("\(holderName) holds your key.")
+        }
+        .scrim()
 
         LockButton(size: compact ? 132 : 176) { state.sheet = .lock }
             .padding(.top, compact ? 22 : 34)
@@ -228,8 +234,11 @@ struct HeroView: View {
 
     @ViewBuilder
     private var noKeyholder: some View {
-        headline("Nobody holds your key yet.")
-        subline("Invite a friend, or enter their code.")
+        VStack(spacing: 0) {
+            headline("Nobody holds your key yet.")
+            subline("Invite a friend, or enter their code.")
+        }
+        .scrim()
 
         LockButton(enabled: false, size: compact ? 132 : 176) {}
             .padding(.top, compact ? 22 : 34)
@@ -277,6 +286,7 @@ struct HeroView: View {
             .foregroundStyle(warn ? Theme.orangeLight : Theme.white60)
             .fixedSize(horizontal: false, vertical: true)
             .legibleOnPhoto()
+            .scrim()
     }
 }
 

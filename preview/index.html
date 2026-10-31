@@ -38,10 +38,14 @@
   .photo-overlay { position: absolute; inset: 0; background:
       linear-gradient(to bottom, rgba(10,10,10,.5) 0%, rgba(10,10,10,0) 22%),
       linear-gradient(to top, rgba(10,10,10,.9) 0%, rgba(10,10,10,.55) 20%, rgba(10,10,10,0) 42%); }
-  .headline, .sub, .helper, .stat, .timer, .ringlabel, .waiting, .apps .label, .held .label { text-shadow: 0 2px 24px rgba(0,0,0,.55), 0 1px 3px rgba(0,0,0,.35); }
-  /* Over photos, secondary type needs more than 60% white to survive bright skies. */
-  .sub, .helper, .waiting { color: rgba(255,255,255,.9); }
-  .stat .l, .apps .label, .held .label, .ringlabel { color: rgba(255,255,255,.72); }
+  .headline, .sub, .helper, .stat, .timer, .ringlabel, .waiting, .apps .label, .held .label { text-shadow: 0 1px 2px rgba(0,0,0,.6), 0 2px 10px rgba(0,0,0,.55), 0 0 40px rgba(0,0,0,.5); }
+  /* Over photos, secondary type is full white and medium weight. */
+  .sub, .helper, .waiting { color: #fff; font-weight: 500; }
+  .stat .l, .apps .label, .held .label, .ringlabel { color: rgba(255,255,255,.8); }
+  /* A soft dark halo behind text blocks: keeps the scenery visible everywhere else. */
+  .scrim { position: relative; z-index: 0; }
+  .scrim::before { content: ""; position: absolute; inset: -30px -90px; z-index: -1; pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(10,10,10,.62) 0%, rgba(10,10,10,.38) 42%, rgba(10,10,10,0) 72%); }
   .ringlabel.orange { color: #FF7A00; }
   .lock.disabled { background: rgba(255,255,255,.14); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.4); color: rgba(255,255,255,.75); backdrop-filter: blur(10px); }
   @keyframes shimmer { from { transform: translateX(-8px); opacity: .55; } to { transform: translateX(8px); opacity: 1; } }
@@ -444,7 +448,7 @@ function renderControls() {
 
 function recordStat(s) {
   const rec = Math.max(s.best, streakSeconds(s));
-  return `<div class="stat"><div class="n">${fmt(rec)}</div><div class="l">RECORD</div></div>`;
+  return `<div class="stat scrim"><div class="n">${fmt(rec)}</div><div class="l">RECORD</div></div>`;
 }
 
 function hero(u) {
@@ -454,15 +458,15 @@ function hero(u) {
     const unlocked = b.unlockUntil && b.unlockUntil > now();
     const pr = pendingRequest(u);
     const paused = s.pauseStart && s.pauseStart <= now() && (!s.pauseUntil || s.pauseUntil > now());
-    let html = `<h2 class="headline">${unlocked ? 'Back in a moment.' : 'Phone down.<br>Look up.'}</h2>`;
-    html += `<p class="sub">${unlocked ? `Unlocked until ${tm(b.unlockUntil)}.` : `${hName} holds the key.`}</p>`;
+    let html = `<div class="scrim"><h2 class="headline">${unlocked ? 'Back in a moment.' : 'Phone down.<br>Look up.'}</h2>`;
+    html += `<p class="sub">${unlocked ? `Unlocked until ${tm(b.unlockUntil)}.` : `${hName} holds the key.`}</p></div>`;
     const secs = streakSeconds(s);
     html += `<div class="lockwrap"><div class="ring ${unlocked ? 'unlocked' : ''}"><div class="timer ${secs >= 86400 ? 'small' : ''}">${clock(secs)}</div><div class="ringlabel ${unlocked ? '' : 'orange'}">${unlocked ? (paused ? 'PAUSED' : 'OPEN') : 'LOCKED'}</div></div></div>`;
     if (b.bgEndsAt) {
       html += `<div class="glass bgpanel"><div class="row"><b>Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}</b><button class="link" onclick="act(()=>cancelBreakGlass('${u}'))">Cancel</button></div><div class="muted">Your streak resets when it completes. Cancel any time before ${dtm(b.bgEndsAt)} to keep it.</div></div>`;
     }
     html += `<div class="actions">`;
-    if (pr) html += `<span class="waiting">Asked ${hName}${pr.minutes ? ` for ${pr.minutes} min` : ''}. Waiting…</span>`;
+    if (pr) html += `<span class="waiting scrim">Asked ${hName}${pr.minutes ? ` for ${pr.minutes} min` : ''}. Waiting…</span>`;
     else html += `<button class="pill" onclick="openSheet('${u}','request')">Ask ${hName} for time</button>`;
     if (!b.bgEndsAt) html += `<button class="pill icon" title="Break Glass" onclick="openSheet('${u}','breakglass')">···</button>`;
     html += `</div>`;
@@ -472,21 +476,21 @@ function hero(u) {
 
   if (h) {
     const grace = s.graceUntil && s.graceUntil > now();
-    let html = `<h2 class="headline">Be here now.</h2><p class="sub">${hName} holds your key.</p>`;
+    let html = `<div class="scrim"><h2 class="headline">Be here now.</h2><p class="sub">${hName} holds your key.</p></div>`;
     html += `<div class="lockwrap"><button class="lock" aria-label="Lock" onclick="pressLock('${u}')">${LOCK_ICON}</button></div>`;
     html += grace
-      ? `<p class="helper warn">Streak paused at ${fmt(streakSeconds(s))}. Lock before ${dtm(s.graceUntil)} to keep it.</p>`
-      : `<p class="helper">Once locked, only ${hName} can give you time.</p>`;
+      ? `<p class="helper warn scrim">Streak paused at ${fmt(streakSeconds(s))}. Lock before ${dtm(s.graceUntil)} to keep it.</p>`
+      : `<p class="helper scrim">Once locked, only ${hName} can give you time.</p>`;
     html += recordStat(s);
     return html;
   }
 
   const grace = s.graceUntil && s.graceUntil > now();
-  let html = `<h2 class="headline">Nobody holds your key yet.</h2><p class="sub">Invite a friend, or enter their code.</p>`;
+  let html = `<div class="scrim"><h2 class="headline">Nobody holds your key yet.</h2><p class="sub">Invite a friend, or enter their code.</p></div>`;
   html += `<div class="lockwrap"><button class="lock disabled" aria-label="Lock (unavailable)" disabled>${LOCK_ICON}</button></div>`;
   html += grace
-    ? `<p class="helper warn">Streak paused at ${fmt(streakSeconds(s))}. Find a keyholder and lock before ${dtm(s.graceUntil)} to keep it.</p>`
-    : `<p class="helper">You cannot lock until someone can unlock you.</p>`;
+    ? `<p class="helper warn scrim">Streak paused at ${fmt(streakSeconds(s))}. Find a keyholder and lock before ${dtm(s.graceUntil)} to keep it.</p>`
+    : `<p class="helper scrim">You cannot lock until someone can unlock you.</p>`;
   html += recordStat(s);
   return html;
 }
