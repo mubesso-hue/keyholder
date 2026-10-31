@@ -83,3 +83,31 @@ begin
      set last_heartbeat_at = p_now, verified = true, heartbeat_alerted = false
    where id = b.id;
 end $$;
+
+-- 3. Server-side guard for app builds that predate the debounced check: a
+--    revocation report in the first two minutes of a block is logged and
+--    ignored. That is exactly when iOS can still report stale authorization.
+create or replace function public._report_revocation(p_user uuid, p_now timestamptz default now())
+returns void language plpgsql set search_path = public as $$
+declare b public.blocks; v_holder uuid;
+begin
+  select * into b from public.blocks where user_id = p_user and status = 'active' for update;
+  if b.id is null then return; end if;
+  if p_now - b.started_at < interval '2 minutes' then
+    perform public._event(p_user, b.id, 'revocation_ignored_new_block');
+    return;
+  end if;
+  v_holder := public._holder_of_block(b);
+  perform public._end_block(b.id, 'revoked', p_now);
+  perform public._streak_reset(p_user, p_now);
+  perform public._event(p_user, b.id, 'revoked');
+  perform public._notify(
+    v_holder,
+    public._name(p_user) || ' turned off Screen Time access',
+    'Their block is gone and their streak reset. You held their key.',
+    'REVOKED',
+    jsonb_build_object('user_id', p_user)
+  );
+  perform public._notify(p_user, 'Your block ended', 'Screen Time access was turned off, so the block was removed and your streak reset.',
+    'BLOCK_ENDED', jsonb_build_object('reason', 'revoked'));
+end $$;

@@ -252,6 +252,11 @@ select pg_temp.assert_raises($$select public.device_event('nope', 'heartbeat', '
 select public.device_event(:'dev_secret', 'request_unlock', '{"minutes": 15}');
 select pg_temp.ok((select count(*) from public.unlock_requests where block_id = :'sarah_block2' and status = 'pending') = 1, 'shield button creates a request');
 
+-- A revocation report in the first two minutes of a block is ignored.
+select public.device_event(:'dev_secret', 'revoked', '{}');
+select pg_temp.ok((select status = 'active' from public.blocks where id = :'sarah_block2'), 'early revocation ignored');
+update public.blocks set started_at = now() - interval '10 minutes' where id = :'sarah_block2';
+
 -- Revocation ends the block, resets the streak, keeps the key.
 select public.device_event(:'dev_secret', 'revoked', '{}');
 select pg_temp.ok((select status = 'ended' and ended_reason = 'revoked' from public.blocks where id = :'sarah_block2'), 'revoked block ended');
