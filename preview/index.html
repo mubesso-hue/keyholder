@@ -373,30 +373,20 @@ function act(fn) { fn(); tick(); render(); }
 const LOCK_ICON = `<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1"/></svg>`;
 const GEAR_ICON = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;
 
-// Layered landscape: sky, horizon glow, two ridges, lake with mirrored ridges, shimmer, legibility overlay.
+// Dusk over still water: sky gradient, horizon glow, lake, a pool of light, shimmer, legibility overlay.
 function landscape() {
-  const far = 'M0 332 L34 298 L70 318 L110 272 L146 300 L178 262 L214 296 L250 270 L286 304 L322 280 L352 300 L375 288 L375 452 L0 452 Z';
-  const near = 'M0 390 L28 372 L62 384 L96 356 L130 380 L166 362 L202 384 L236 368 L270 388 L306 372 L340 386 L375 374 L375 452 L0 452 Z';
   return `<svg class="bg" viewBox="0 0 375 812" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
     <defs>
       <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0A0A"/><stop offset=".5" stop-color="#19191a"/><stop offset="1" stop-color="#332b26"/></linearGradient>
       <radialGradient id="glow" cx="50%" cy="100%" r="70%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".62"/><stop offset=".4" stop-color="#FF7A00" stop-opacity=".2"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
       <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#26211d"/><stop offset=".35" stop-color="#141313"/><stop offset="1" stop-color="#0A0A0A"/></linearGradient>
-      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
-      <mask id="reflect"><rect x="0" y="452" width="375" height="220" fill="url(#fade)"/></mask>
       <linearGradient id="bottom" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0A0A" stop-opacity="0"/><stop offset=".5" stop-color="#0A0A0A" stop-opacity=".86"/><stop offset="1" stop-color="#0A0A0A" stop-opacity=".98"/></linearGradient>
       <linearGradient id="shine" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
       <filter id="soft" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="16"/></filter>
     </defs>
     <rect width="375" height="452" fill="url(#sky)"/>
     <rect x="0" y="170" width="375" height="282" fill="url(#glow)"/>
-    <path d="${far}" fill="#2a2a2d"/>
-    <path d="${near}" fill="#161617"/>
     <rect y="452" width="375" height="360" fill="url(#lake)"/>
-    <g mask="url(#reflect)" transform="translate(0,904) scale(1,-1)">
-      <path d="${far}" fill="#2a2a2d"/>
-      <path d="${near}" fill="#161617"/>
-    </g>
     <rect y="451.5" width="375" height="1" fill="#fff" opacity=".14"/>
     <ellipse cx="187" cy="470" rx="150" ry="30" fill="#FF7A00" opacity=".28" filter="url(#soft)"/>
     <g class="shimmer">
