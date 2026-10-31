@@ -214,7 +214,13 @@ struct MyCardView: View {
         Text("Invite a friend to hold your key, or enter the code they sent you. You cannot lock until someone can unlock you.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
-        if snapshot.streak.bestSeconds > 0 {
+        if snapshot.streak.isOnGrace, let graceUntil = snapshot.streak.graceUntil {
+            // Orphaned by a partner's Break Glass: the streak survives for a day.
+            StreakView(streak: snapshot.streak, offset: state.clockOffset, compact: true)
+            Text("Streak paused. Find a new keyholder and lock before \(graceUntil.shortDateTime) to keep it.")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+        } else if snapshot.streak.bestSeconds > 0 {
             Text("Record \(StreakState.format(snapshot.streak.bestSeconds))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

@@ -25,39 +25,45 @@ keyholder/
     └── KeyholderShieldAction/        "Ask" button on the shield → unlock request
 ```
 
+## 0. Preview
+
+`preview/index.html` is a self-contained interactive mock of both phones with the
+product rules simulated in JavaScript (same streak, request, Break Glass and
+orphan logic as the SQL). Open it in any browser, speed up time, and click
+through the flows. It is a UX preview, not the iOS build.
+
 ## 1. Supabase
 
-1. Create a project. Note the project URL and anon key.
-2. Apply the migration:
-   ```bash
-   supabase link --project-ref <ref>
-   supabase db push
-   ```
-   or paste `supabase/migrations/0001_init.sql` into the SQL editor.
-3. Enable **pg_cron** (Database › Extensions). If the migration printed a notice
-   that pg_cron was unavailable, run once:
-   ```sql
-   select cron.schedule('keyholder_tick', '* * * * *', 'select public.cron_tick()');
-   ```
-4. Auth › Providers › **Apple**: enable, add your Services ID / bundle id. Native
-   Sign in with Apple only needs the app's bundle id listed as an authorized client.
-5. Deploy the functions:
-   ```bash
-   supabase functions deploy device-event --no-verify-jwt
-   supabase functions deploy send-push --no-verify-jwt
-   ```
-6. Function secrets (Edge Functions › Secrets):
+The live backend is project `keyholder` (ref `apatxdwaozoozkigrgbt`, eu-west-1).
+Already done there: all three migrations, the per-minute `cron_tick` job, both
+edge functions, and the pg_net trigger that hands new `notifications` rows to
+`send-push`. `ios/Config.xcconfig` already points at it.
+
+Still needed, and only you can do these:
+
+1. Auth › Providers › **Apple**: enable it and add the app's bundle id
+   (`com.keyholder.app`) as an authorized client id. Native Sign in with Apple
+   needs nothing else.
+2. Edge Functions › Secrets, once you have an APNs key from Apple:
    ```
    APNS_TEAM_ID=XXXXXXXXXX
    APNS_KEY_ID=YYYYYYYYYY
    APNS_PRIVATE_KEY=-----BEGIN PRIVATE KEY----- ... -----END PRIVATE KEY-----
    APNS_BUNDLE_ID=com.keyholder.app
    APNS_ENV=sandbox            # production for TestFlight / App Store builds
-   PUSH_WEBHOOK_SECRET=<long random string>
    ```
-7. Database › Webhooks: new webhook on table `notifications`, event **Insert**,
-   type HTTP request, POST to `https://<ref>.supabase.co/functions/v1/send-push`,
-   header `x-webhook-secret: <PUSH_WEBHOOK_SECRET>`.
+   Until these exist, `send-push` leaves rows unsent (`sent_at` null) instead of failing.
+   `PUSH_WEBHOOK_SECRET` is optional; the function only delivers rows that are
+   already queued in the database, so there is nothing to forge.
+
+To recreate the backend elsewhere:
+```bash
+supabase link --project-ref <ref>
+supabase db push
+supabase functions deploy device-event --no-verify-jwt
+supabase functions deploy send-push --no-verify-jwt
+```
+Edit the project URL inside `supabase/migrations/0002_push_webhook.sql` first.
 
 To re-run the schema test locally you need a Postgres 16 server:
 ```bash

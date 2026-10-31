@@ -326,7 +326,10 @@ function myCard(u) {
     html += `<div class="btns"><button class="btn primary" onclick="openSheet('${u}','lock',{lockStep:1})">🔒 Lock</button></div><div class="muted small" style="margin-top:8px">Once locked, only ${hName} can give you time.</div>`;
     return html;
   }
-  return `<div class="headline">🔑 Nobody holds your key yet</div><div class="muted" style="margin-top:6px">Invite a friend to hold your key, or enter the code they sent you. You cannot lock until someone can unlock you.</div>${s.best > 0 ? `<div class="record" style="margin-top:6px">Record ${fmt(s.best)}</div>` : ''}`;
+  let html = `<div class="headline">🔑 Nobody holds your key yet</div><div class="muted" style="margin-top:6px">Invite a friend to hold your key, or enter the code they sent you. You cannot lock until someone can unlock you.</div>`;
+  if (s.graceUntil && s.graceUntil > now()) html += `<div style="margin:8px 0">${streakView(s, true)}</div><div class="muted" style="color:var(--orange)">Streak paused. Find a new keyholder and lock before ${dtm(s.graceUntil)} to keep it.</div>`;
+  else if (s.best > 0) html += `<div class="record" style="margin-top:6px">Record ${fmt(s.best)}</div>`;
+  return html;
 }
 
 function heldCard(h, u) {
