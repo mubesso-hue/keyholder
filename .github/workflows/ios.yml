@@ -12,6 +12,9 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Compile app and extensions (simulator, unsigned)
@@ -45,7 +48,7 @@ jobs:
       - name: Build
         working-directory: ios
         run: |
-          set -o pipefail
+          set +e
           xcodebuild build \
             -project Keyholder.xcodeproj \
             -scheme Keyholder \
@@ -53,8 +56,43 @@ jobs:
             -derivedDataPath DerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            | tee build.log | grep -E "error:|warning: .*(deprecated|unused)|BUILD (SUCCEEDED|FAILED)" || true
-          grep -q "BUILD SUCCEEDED" build.log
+            > build.log 2>&1
+          status=$?
+          grep -E "error:" build.log | sed -E 's#/Users/runner/work/keyholder/keyholder/##g' | sort -u > build-errors.log
+          echo "== errors (unique)"; cat build-errors.log
+          echo "== result"; grep -E "\*\* BUILD (SUCCEEDED|FAILED) \*\*" build.log || true
+          head -10 build-errors.log | while IFS= read -r line; do echo "::error::$line"; done
+          exit $status
+
+      # The log and artifact blobs are not reachable from every network, so
+      # also publish the errors to a branch readable through the plain API.
+      - name: Publish errors to ci-logs branch
+        if: always()
+        working-directory: ios
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "run: $GITHUB_RUN_ID  sha: $GITHUB_SHA  $(date -u +%FT%TZ)"
+            echo "result: $(grep -oE '\*\* BUILD (SUCCEEDED|FAILED) \*\*' build.log | tail -1)"
+            echo
+            echo "=== unique errors ==="
+            cat build-errors.log 2>/dev/null
+            echo
+            echo "=== last 200 lines of build.log ==="
+            tail -200 build.log 2>/dev/null
+          } > publish.log
+          REPO="$GITHUB_REPOSITORY"
+          if ! gh api "repos/$REPO/git/refs/heads/ci-logs" >/dev/null 2>&1; then
+            gh api -X POST "repos/$REPO/git/refs" -f ref=refs/heads/ci-logs -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          CONTENT=$(base64 < publish.log | tr -d '\n')
+          SHA=$(gh api "repos/$REPO/contents/ios-build.log?ref=ci-logs" --jq .sha 2>/dev/null || true)
+          if [ -n "$SHA" ]; then
+            gh api -X PUT "repos/$REPO/contents/ios-build.log" -f message="ci log $GITHUB_RUN_ID" -f content="$CONTENT" -f branch=ci-logs -f sha="$SHA" >/dev/null
+          else
+            gh api -X PUT "repos/$REPO/contents/ios-build.log" -f message="ci log $GITHUB_RUN_ID" -f content="$CONTENT" -f branch=ci-logs >/dev/null
+          fi
 
       - name: Upload build log
         if: always()
