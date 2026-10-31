@@ -19,12 +19,13 @@ struct LockButton: View {
                     Circle().fill(Theme.orangeGradient)
                     Circle().stroke(.white.opacity(0.35), lineWidth: 1).padding(1)
                 } else {
-                    Circle().fill(Theme.white08)
-                    Circle().stroke(Theme.white15, lineWidth: 1)
+                    Circle().fill(.ultraThinMaterial)
+                    Circle().fill(Color.white.opacity(0.14))
+                    Circle().stroke(Color.white.opacity(0.4), lineWidth: 1.5)
                 }
                 Image(systemName: "lock")
                     .font(.system(size: size * 0.3, weight: .light))
-                    .foregroundStyle(enabled ? Color.white : Theme.white40)
+                    .foregroundStyle(enabled ? Color.white : Color.white.opacity(0.75))
             }
             .frame(width: size, height: size)
             .shadow(color: enabled ? Theme.orangeMid.opacity(breathing ? 0.62 : 0.45) : .clear, radius: breathing ? 40 : 28)

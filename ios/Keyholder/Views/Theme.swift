@@ -3,8 +3,10 @@ import SwiftUI
 /// The whole palette: black, white at three opacities, and one orange gradient.
 enum Theme {
     static let ink = Color(hex: 0x0A0A0A)
-    static let white60 = Color.white.opacity(0.6)
-    static let white40 = Color.white.opacity(0.4)
+    /// Secondary type. Over the photo backgrounds 60% white washes out on bright
+    /// skies, so this sits at 90% and the label tone at 72%.
+    static let white60 = Color.white.opacity(0.9)
+    static let white40 = Color.white.opacity(0.72)
     static let white15 = Color.white.opacity(0.15)
     static let white08 = Color.white.opacity(0.08)
 
