@@ -34,6 +34,8 @@ final class AppState: ObservableObject {
     @Published private(set) var snapshot: Snapshot?
     @Published private(set) var isRefreshing = false
     @Published var errorMessage: String?
+    /// The last refresh couldn't reach the server. Shown as a quiet label, not an alert.
+    @Published private(set) var isOffline = false
     @Published var sheet: Sheet?
     @Published var busy = false
 
@@ -111,15 +113,62 @@ final class AppState: ObservableObject {
         isRefreshing = true
         defer { isRefreshing = false }
         do {
-            let snap = try await api.snapshot()
+            let snap = try await fetchSnapshot()
+            markOnline()
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
             settlePendingAppChange(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
             scheduleLocalTimers(for: snap.block)
             await checkAuthorizationAndHeartbeat(block: snap.block)
+        } catch let error where error.isCancellation {
+            return
+        } catch let error where error.isConnectionProblem {
+            // The block lives on the phone and keeps working; just try again soon.
+            markOffline()
         } catch {
             errorMessage = error.userMessage
+        }
+    }
+
+    /// iOS closes the app's connections while it's in the background, so the
+    /// first request after coming back often fails with "The network connection
+    /// was lost" even though the network is fine. Reading is safe to repeat.
+    private func fetchSnapshot() async throws -> Snapshot {
+        var attempt = 0
+        while true {
+            do {
+                return try await api.snapshot()
+            } catch let error where error.isConnectionProblem && !error.isCancellation && attempt < 2 {
+                attempt += 1
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 700_000_000)
+            }
+        }
+    }
+
+    private var offlineRetry: Task<Void, Never>?
+    private var needsDeviceRegistration = false
+    private var unsentAPNsToken: String?
+
+    private func markOffline() {
+        isOffline = true
+        guard offlineRetry == nil else { return }
+        offlineRetry = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.offlineRetry = nil
+            await self.refresh()
+        }
+    }
+
+    private func markOnline() {
+        isOffline = false
+        offlineRetry?.cancel()
+        offlineRetry = nil
+        if needsDeviceRegistration {
+            needsDeviceRegistration = false
+            let token = unsentAPNsToken
+            Task { [weak self] in await self?.registerDevice(apnsToken: token) }
         }
     }
 
@@ -215,7 +264,7 @@ final class AppState: ObservableObject {
     }
 
     private func refreshSilently() async {
-        if let snap = try? await api.snapshot() {
+        if let snap = try? await fetchSnapshot() {
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
             settlePendingAppChange(snap)
@@ -236,6 +285,11 @@ final class AppState: ObservableObject {
             let device = try await api.registerDevice(apnsToken: apnsToken, deviceID: SharedStore.deviceID)
             SharedStore.deviceID = device.id.uuidString
             SharedStore.deviceSecret = device.deviceSecret
+            if apnsToken != nil { unsentAPNsToken = nil }
+        } catch let error where error.isConnectionProblem {
+            // Try again after the next successful refresh, keeping the push token.
+            if let apnsToken { unsentAPNsToken = apnsToken }
+            needsDeviceRegistration = true
         } catch {
             errorMessage = error.userMessage
         }
@@ -450,6 +504,12 @@ final class AppState: ObservableObject {
         do {
             try await work()
             await refresh()
+        } catch let error where error.isCancellation {
+            return
+        } catch let error where error.isConnectionProblem {
+            // The request may or may not have reached the server: show what's true now.
+            await refresh()
+            errorMessage = "The connection dropped. If nothing changed, try again."
         } catch {
             errorMessage = error.userMessage
         }

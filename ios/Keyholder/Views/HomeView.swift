@@ -68,6 +68,13 @@ struct HomeView: View {
             Text("Keyholder")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.white60)
+            if state.isOffline {
+                // Shown instead of an alert: the block and timer keep working offline.
+                Text("Offline")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.white40)
+                    .padding(.leading, 6)
+            }
             Spacer()
             Button { state.sheet = .settings } label: {
                 Image(systemName: "gearshape")
@@ -178,51 +185,44 @@ struct HeroView: View {
         .glass()
     }
 
+    /// Ask for time, and Break Glass in plain sight. Change apps sits underneath as a link.
     private func actions(_ block: Block) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                if let pending = snapshot.myPendingRequest {
-                    Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Theme.white60)
-                } else {
-                    Button("Ask \(holderName) for time") { state.sheet = .request }
-                        .buttonStyle(GlassPillStyle())
-                        .disabled(state.busy)
-                }
-
-                Menu {
-                    Button { state.sheet = .editApps } label: {
-                        Label("Change apps…", systemImage: "square.grid.2x2")
-                    }
-                    if block.breakGlassEndsAt == nil {
-                        Button(role: .destructive) { state.sheet = .breakGlass } label: {
-                            Label("Break Glass…", systemImage: "exclamationmark.triangle")
-                        }
-                    }
-                } label: {
-                    Text("···")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(.white)
-                        .frame(width: 46, height: 46)
-                        .background {
-                            Circle().fill(.ultraThinMaterial)
-                                .overlay(Circle().fill(Theme.white08))
-                                .overlay(Circle().stroke(Theme.white15, lineWidth: 1))
-                        }
-                }
-                .accessibilityLabel("More")
+        VStack(spacing: 10) {
+            if let pending = snapshot.myPendingRequest {
+                Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Theme.white60)
+                    .padding(.vertical, 12)
+                    .legibleOnPhoto()
+            } else {
+                Button("Ask \(holderName) for time") { state.sheet = .request }
+                    .buttonStyle(GlassPillStyle(fullWidth: true))
+                    .disabled(state.busy)
             }
+
+            // While Break Glass runs, the panel above shows the countdown and Cancel instead.
+            if block.breakGlassEndsAt == nil {
+                Button("Break Glass") { state.sheet = .breakGlass }
+                    .buttonStyle(BreakGlassPillStyle(fullWidth: true))
+                    .disabled(state.busy)
+            }
+
+            Button("Change apps") { state.sheet = .editApps }
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.white60)
+                .padding(.top, 6)
+                .legibleOnPhoto()
 
             if state.pendingAppChange != nil, let change = snapshot.myAppChange?.change {
                 Text("Waiting for \(holderName) to OK your app change: \(change.request).")
                     .font(Theme.helper)
                     .foregroundStyle(Theme.white60)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
+                    .padding(.top, 2)
                     .legibleOnPhoto()
             }
         }
+        .frame(maxWidth: 300)
     }
 
     // Ready to lock -----------------------------------------------------------

@@ -250,6 +250,39 @@ extension Error {
         if let pg = self as? PostgrestError {
             return pg.message
         }
+        if isConnectionProblem {
+            return "No connection. Check your signal and try again."
+        }
         return localizedDescription
     }
+
+    /// The request was cancelled, e.g. a pull-to-refresh that was let go.
+    var isCancellation: Bool {
+        if self is CancellationError { return true }
+        let ns = self as NSError
+        return ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
+    }
+
+    /// No signal, a dropped connection, a timeout, or a cancelled request:
+    /// worth retrying quietly, not worth an alert.
+    var isConnectionProblem: Bool {
+        if self is CancellationError { return true }
+        let ns = self as NSError
+        guard ns.domain == NSURLErrorDomain else { return false }
+        return connectionErrorCodes.contains(ns.code)
+    }
 }
+
+private let connectionErrorCodes: Set<Int> = [
+    NSURLErrorNetworkConnectionLost,
+    NSURLErrorNotConnectedToInternet,
+    NSURLErrorTimedOut,
+    NSURLErrorCannotConnectToHost,
+    NSURLErrorCannotFindHost,
+    NSURLErrorDNSLookupFailed,
+    NSURLErrorInternationalRoamingOff,
+    NSURLErrorDataNotAllowed,
+    NSURLErrorCallIsActive,
+    NSURLErrorSecureConnectionFailed,
+    NSURLErrorCancelled,
+]

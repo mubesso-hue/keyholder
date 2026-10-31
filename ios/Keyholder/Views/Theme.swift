@@ -10,6 +10,10 @@ enum Theme {
     static let white15 = Color.white.opacity(0.15)
     static let white08 = Color.white.opacity(0.08)
 
+    /// Break Glass only. The one place red appears.
+    static let breakRed = Color(hex: 0xE5484D)
+    static let breakRedDeep = Color(hex: 0xC4262C)
+
     static let orangeLight = Color(hex: 0xFFB347)
     static let orangeMid = Color(hex: 0xFF7A00)
     static let orangeDeep = Color(hex: 0xFF4D00)
@@ -73,12 +77,14 @@ extension View {
 /// Secondary action: a frosted pill.
 struct GlassPillStyle: ButtonStyle {
     var compact = false
+    var fullWidth = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: compact ? 13 : 15, weight: .medium))
             .foregroundStyle(.white)
-            .padding(.vertical, compact ? 8 : 12)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .padding(.vertical, compact ? 8 : 14)
             .padding(.horizontal, compact ? 12 : 22)
             .background {
                 Capsule().fill(.ultraThinMaterial)
@@ -86,6 +92,30 @@ struct GlassPillStyle: ButtonStyle {
                     .overlay(Capsule().stroke(Theme.white15, lineWidth: 1))
             }
             .opacity(configuration.isPressed ? 0.7 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// Break Glass: a solid red pill, so the way out is always in plain sight.
+struct BreakGlassPillStyle: ButtonStyle {
+    var fullWidth = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 22)
+            .background {
+                Capsule()
+                    .fill(LinearGradient(colors: [Theme.breakRed, Theme.breakRedDeep],
+                                         startPoint: .top, endPoint: .bottom))
+                    .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
+                    .shadow(color: Theme.breakRedDeep.opacity(0.35), radius: 14, y: 6)
+            }
+            .opacity(configuration.isPressed ? 0.8 : 1)
             .scaleEffect(configuration.isPressed ? 0.97 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
