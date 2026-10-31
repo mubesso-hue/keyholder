@@ -117,6 +117,26 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: "invalid json" }, 400);
   }
+
+  // Health check: { "check": "apns" } reports whether the secrets are present and
+  // the private key signs a token. Nothing is sent and nothing is revealed.
+  if (payload && typeof payload === "object" && (payload as Record<string, unknown>).check === "apns") {
+    const present = Object.fromEntries(
+      ["APNS_TEAM_ID", "APNS_KEY_ID", "APNS_PRIVATE_KEY", "APNS_BUNDLE_ID", "APNS_ENV"].map((k) => [k, !!Deno.env.get(k)]),
+    );
+    let jwtOk = false, jwtError: string | undefined;
+    if (apnsConfigured()) {
+      try {
+        cachedJwt = null;
+        await apnsJwt();
+        jwtOk = true;
+      } catch (e) {
+        jwtError = e instanceof Error ? e.message : String(e);
+      }
+    }
+    return json({ present, jwt_ok: jwtOk, jwt_error: jwtError, host: apnsHost() });
+  }
+
   const id = extractId(payload);
   if (id === null) return json({ error: "notification id required" }, 400);
 
