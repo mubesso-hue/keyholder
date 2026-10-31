@@ -19,6 +19,8 @@ enum SharedStore {
         static let deviceSecret = "deviceSecret"
         static let pendingShieldRequestAt = "pendingShieldRequestAt"
         static let lastExtensionEvent = "lastExtensionEvent"
+        static let blockMode = "blockMode"
+        static let allowedSelection = "allowedSelection"
     }
 
     // MARK: Blocked apps
@@ -34,6 +36,28 @@ enum SharedStore {
                 defaults.set(data, forKey: Key.selection)
             } else {
                 defaults.removeObject(forKey: Key.selection)
+            }
+        }
+    }
+
+    /// How the current or next block shields apps. Defaults to everything-except.
+    static var blockMode: BlockMode {
+        get { defaults.string(forKey: Key.blockMode).flatMap(BlockMode.init(rawValue:)) ?? .allExcept }
+        set { defaults.set(newValue.rawValue, forKey: Key.blockMode) }
+    }
+
+    /// The apps that stay open in everything-except mode. Remembered between
+    /// locks, so after the first time the essentials are already set up.
+    static var allowedSelection: FamilyActivitySelection? {
+        get {
+            guard let data = defaults.data(forKey: Key.allowedSelection) else { return nil }
+            return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: Key.allowedSelection)
+            } else {
+                defaults.removeObject(forKey: Key.allowedSelection)
             }
         }
     }

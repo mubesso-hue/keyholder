@@ -143,16 +143,37 @@ final class AppState: ObservableObject {
     }
 
     /// Detect a revoked Screen Time authorization and tell the server; otherwise heartbeat.
+    ///
+    /// iOS can briefly report "not authorized" when it isn't, for example right
+    /// after access is granted during setup. A single reading once ended a fresh
+    /// block, reset the streak and told the keyholder access was switched off.
+    /// So: re-check several times over about five seconds, never act during the
+    /// first minute of a block, and only then report a revocation.
     func checkAuthorizationAndHeartbeat(block: Block?) async {
         screenTime.refreshStatus()
         guard let block, block.isActive else { return }
-        if !screenTime.isAuthorized {
-            try? await api.reportRevocation()
-            await refreshSilently()
-        } else {
+        if screenTime.isAuthorized {
             try? await api.heartbeat(authorized: true, shielded: ShieldController.isShielding)
+            return
         }
+        guard !revocationCheckInFlight else { return }
+        revocationCheckInFlight = true
+        defer { revocationCheckInFlight = false }
+
+        for _ in 0..<4 {
+            try? await Task.sleep(nanoseconds: 1_250_000_000)
+            screenTime.refreshStatus()
+            if screenTime.isAuthorized {
+                try? await api.heartbeat(authorized: true, shielded: ShieldController.isShielding)
+                return
+            }
+        }
+        guard serverNow.timeIntervalSince(block.startedAt) > 60 else { return }
+        try? await api.reportRevocation()
+        await refreshSilently()
     }
+
+    private var revocationCheckInFlight = false
 
     private func refreshSilently() async {
         if let snap = try? await api.snapshot() {
@@ -183,15 +204,18 @@ final class AppState: ObservableObject {
     // MARK: Actions
 
     func lock(coolingOffHours: Int) async {
+        let mode = screenTime.mode
         let counts = screenTime.selectionCounts
-        guard counts.apps + counts.categories > 0 else {
+        let allowedCount = screenTime.allowedCount
+        if mode == .selected && counts.apps + counts.categories == 0 {
             errorMessage = "Pick at least one app or category."
             return
         }
         screenTime.persistSelection()
         await run {
-            _ = try await self.api.startBlock(coolingOffHours: coolingOffHours,
-                                              appCount: counts.apps, categoryCount: counts.categories)
+            _ = try await self.api.startBlock(coolingOffHours: coolingOffHours, mode: mode,
+                                              appCount: counts.apps, categoryCount: counts.categories,
+                                              allowedCount: allowedCount)
         }
     }
 

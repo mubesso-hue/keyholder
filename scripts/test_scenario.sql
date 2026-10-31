@@ -217,6 +217,14 @@ select id as sarah_block2 from public.start_block(24, 2, 0) \gset
 select pg_temp.ok((select started_at = :'sarah_started_before'::timestamptz and grace_until is null and pause_started_at is null
                      from public.streaks where user_id = :'sarah'), 'streak resumed after re-lock');
 
+-- Block modes -------------------------------------------------------------------
+select pg_temp.assert_raises($$select public.start_block(24, 0, 0, 'weird', 0)$$, 'unknown block mode');
+
+-- A "no access" heartbeat no longer ends a block: it only marks it unverified.
+select public.heartbeat(false, true);
+select pg_temp.ok((select status = 'active' and not verified from public.blocks where id = :'sarah_block2'), 'unauthorized heartbeat keeps the block');
+select pg_temp.ok((select count(*) from public.events where block_id = :'sarah_block2' and type = 'heartbeat_unauthorized') = 1, 'unauthorized heartbeat is logged');
+
 -- Heartbeat + revocation --------------------------------------------------------
 select public.heartbeat(true, true);
 select pg_temp.ok((select verified from public.blocks where id = :'sarah_block2'), 'verified after heartbeat');
@@ -257,6 +265,17 @@ select pg_temp.as_user(:'tom');
 select ended_reason as resign_reason from public.end_key((select id from public.keys where status = 'active' and holder_id = :'tom')) \gset
 select pg_temp.ok(:'resign_reason' = 'holder_resigned', 'holder resigned');
 
+-- all_except mode: lock with zero picked apps is allowed, counts recorded.
+select pg_temp.as_user(:'tom');
+select public.create_invite('hold_mine') as code4 \gset
+select pg_temp.as_user(:'marc');
+select count(*) from public.accept_invite(:'code4');
+select pg_temp.as_user(:'tom');
+select mode as tom_mode, allowed_count as tom_allowed from public.start_block(24, 0, 0, 'all_except', 5) \gset
+select pg_temp.ok(:'tom_mode' = 'all_except' and :tom_allowed = 5, 'all_except block stores mode and allowed count');
+select pg_temp.ok((select body like '%Everything is blocked except 5 apps.%' from public.notifications where category = 'BLOCK_STARTED' order by id desc limit 1), 'holder told everything except 5 apps');
+select pg_temp.assert_raises('select public.start_block(24, 0, 0)', 'already locked');
+
 -- Unauthenticated callers are rejected.
 select pg_temp.as_nobody();
 select pg_temp.assert_raises('select public.me_snapshot()', 'not authenticated');
@@ -267,7 +286,7 @@ set role authenticated;
 select pg_temp.as_user(:'tom');
 select pg_temp.ok((select count(*) from public.blocks where user_id = :'marc') = 0, 'rls: stranger cannot read marc');
 select pg_temp.ok((select count(*) from public.blocks where user_id = :'sarah') = 2, 'rls: former holder still sees sarah history');
-select pg_temp.ok((select count(*) from public.profiles) = 2, 'rls: self plus related only');
+select pg_temp.ok((select count(*) from public.profiles) = 3, 'rls: self plus related only (sarah, marc)');
 select pg_temp.assert_raises('select public.cron_tick()', 'permission denied');
 select pg_temp.assert_raises($$select public.device_event('x', 'heartbeat', '{}')$$, 'permission denied');
 select pg_temp.assert_raises('select public.notify_send_push()', 'permission denied');

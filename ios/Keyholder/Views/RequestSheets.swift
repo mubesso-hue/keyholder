@@ -25,6 +25,15 @@ struct RequestUnlockSheet: View {
                         }
                         .disabled(state.busy)
                     }
+                    CustomDurationPicker(
+                        actionTitle: { "Ask for \(UnlockDuration.format(minutes: $0))" },
+                        disabled: state.busy
+                    ) { minutes in
+                        Task {
+                            await state.requestUnlock(.custom(minutes))
+                            dismiss()
+                        }
+                    }
                 } header: {
                     Text("How long?")
                 } footer: {
@@ -81,6 +90,15 @@ struct DecideRequestSheet: View {
                         }
                         .disabled(state.busy)
                     }
+                    CustomDurationPicker(
+                        actionTitle: { "Give \(UnlockDuration.format(minutes: $0))" },
+                        disabled: state.busy
+                    ) { minutes in
+                        Task {
+                            await act(.approvedTimed, duration: .custom(minutes))
+                            dismiss()
+                        }
+                    }
                 }
 
                 Section {
@@ -120,6 +138,68 @@ struct DecideRequestSheet: View {
             await state.decide(request, decision: decision, duration: duration)
         } else {
             await state.holderUnlock(held, decision: decision, duration: duration)
+        }
+    }
+}
+
+/// "Custom…" row that expands into hour and minute wheels, from 15 minutes to 24 hours.
+struct CustomDurationPicker: View {
+    let actionTitle: (Int) -> String
+    var disabled = false
+    let action: (Int) -> Void
+
+    @State private var expanded = false
+    @State private var hours = 0
+    @State private var minutes = 45
+
+    private let minuteSteps = Array(stride(from: 0, through: 55, by: 5))
+
+    private var total: Int { hours * 60 + minutes }
+    private var isValid: Bool {
+        total >= UnlockDuration.minimumMinutes && total <= UnlockDuration.maximumMinutes
+    }
+
+    var body: some View {
+        if expanded {
+            VStack(spacing: 10) {
+                HStack(spacing: 0) {
+                    Picker("Hours", selection: $hours) {
+                        ForEach(0..<25, id: \.self) { Text("\($0) h").tag($0) }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity, maxHeight: 130)
+                    .clipped()
+
+                    Picker("Minutes", selection: $minutes) {
+                        ForEach(minuteSteps, id: \.self) { Text("\($0) min").tag($0) }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity, maxHeight: 130)
+                    .clipped()
+                }
+                .labelsHidden()
+
+                Button {
+                    action(total)
+                } label: {
+                    Text(isValid ? actionTitle(total) : (total < UnlockDuration.minimumMinutes ? "At least 15 minutes" : "At most 24 hours"))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!isValid || disabled)
+            }
+            .padding(.vertical, 4)
+        } else {
+            Button {
+                withAnimation { expanded = true }
+            } label: {
+                HStack {
+                    Text("Custom…")
+                    Spacer()
+                    Image(systemName: "chevron.down").foregroundStyle(.secondary)
+                }
+            }
+            .disabled(disabled)
         }
     }
 }

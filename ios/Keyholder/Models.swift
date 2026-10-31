@@ -44,8 +44,22 @@ struct Block: Codable, Identifiable, Equatable {
     let breakGlassEndsAt: Date?
     let lastHeartbeatAt: Date
     let verified: Bool
+    /// "selected" or "all_except". Optional so rows from before the column existed decode.
+    let mode: String?
+    let allowedCount: Int?
 
     var isActive: Bool { status == .active }
+
+    var isAllExcept: Bool { mode == BlockMode.allExcept.rawValue }
+
+    /// "Everything except 6 apps" or "5 apps, 1 category".
+    var summary: String {
+        if isAllExcept {
+            let n = allowedCount ?? 0
+            return "Everything except \(n) \(n == 1 ? "app" : "apps")"
+        }
+        return "\(appCount) \(appCount == 1 ? "app" : "apps"), \(categoryCount) \(categoryCount == 1 ? "category" : "categories")"
+    }
 
     func isTemporarilyUnlocked(at now: Date = Date()) -> Bool {
         guard let unlockUntil else { return false }
@@ -147,11 +161,17 @@ struct InvitePreview: Codable {
 enum UnlockDuration: Hashable, Identifiable {
     case minutes(Int)
     case restOfDay
+    /// Any length the person dials in, from 15 minutes to 24 hours.
+    case custom(Int)
+
+    static let minimumMinutes = 15
+    static let maximumMinutes = 1440
 
     var id: String {
         switch self {
         case .minutes(let m): return "m\(m)"
         case .restOfDay: return "rest"
+        case .custom(let m): return "c\(m)"
         }
     }
 
@@ -161,18 +181,29 @@ enum UnlockDuration: Hashable, Identifiable {
         switch self {
         case .minutes(let m): return m >= 60 ? "\(m / 60) hour" : "\(m) min"
         case .restOfDay: return "Rest of today"
+        case .custom(let m): return Self.format(minutes: m)
         }
     }
 
-    /// Minutes to send to the server. Rest-of-day is clamped to the 15 min minimum.
+    /// "45 min", "2 h", "1 h 20 min".
+    static func format(minutes: Int) -> String {
+        let h = minutes / 60, m = minutes % 60
+        if h == 0 { return "\(m) min" }
+        if m == 0 { return "\(h) h" }
+        return "\(h) h \(m) min"
+    }
+
+    /// Minutes to send to the server, always within 15 minutes to 24 hours.
     func minutes(now: Date = Date()) -> Int {
         switch self {
         case .minutes(let m):
             return m
+        case .custom(let m):
+            return min(Self.maximumMinutes, max(Self.minimumMinutes, m))
         case .restOfDay:
             let midnight = Calendar.current.startOfDay(for: now.addingTimeInterval(86_400))
             let m = Int(midnight.timeIntervalSince(now) / 60)
-            return min(1440, max(15, m))
+            return min(Self.maximumMinutes, max(Self.minimumMinutes, m))
         }
     }
 }

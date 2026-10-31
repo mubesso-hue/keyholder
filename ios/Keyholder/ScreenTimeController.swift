@@ -9,6 +9,11 @@ import DeviceActivity
 final class ScreenTimeController: ObservableObject {
     @Published private(set) var status: AuthorizationStatus = AuthorizationCenter.shared.authorizationStatus
     @Published var selection: FamilyActivitySelection = SharedStore.selection ?? FamilyActivitySelection()
+    /// Apps that stay open in everything-except mode. Picking a category such as
+    /// Finance keeps every app in it open, hence includeEntireCategory.
+    @Published var allowedSelection: FamilyActivitySelection =
+        SharedStore.allowedSelection ?? FamilyActivitySelection(includeEntireCategory: true)
+    @Published var mode: BlockMode = SharedStore.blockMode
     @Published private(set) var lastError: String?
 
     var isAuthorized: Bool { status == .approved }
@@ -30,8 +35,13 @@ final class ScreenTimeController: ObservableObject {
         refreshStatus()
     }
 
+    /// Number of apps kept open in everything-except mode.
+    var allowedCount: Int { allowedSelection.applicationTokens.count }
+
     func persistSelection() {
         SharedStore.selection = selection
+        SharedStore.allowedSelection = allowedSelection
+        SharedStore.blockMode = mode
     }
 
     /// Make the device match the server. Safe to call often.
@@ -55,9 +65,7 @@ final class ScreenTimeController: ObservableObject {
             try? MonitorScheduler.schedule(.unlockWindow, until: until)
         } else {
             SharedStore.unlockUntil = nil
-            if let selection = SharedStore.selection {
-                ShieldController.applyShields(selection)
-            }
+            ShieldController.applyStoredShields()
             MonitorScheduler.cancel(.unlockWindow)
         }
 

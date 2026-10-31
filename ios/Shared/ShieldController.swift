@@ -16,6 +16,15 @@ extension DeviceActivityName {
     static let heartbeat = Self("heartbeat")
 }
 
+/// How a block decides what to shield.
+enum BlockMode: String, Codable {
+    /// Block only the apps and categories the user picked.
+    case selected
+    /// Block everything except the apps the user keeps open (Phone, Messages,
+    /// Maps, banking...). Apps installed later are blocked too.
+    case allExcept = "all_except"
+}
+
 /// Thin wrapper over the ManagedSettings store. Used by the app and the monitor extension.
 enum ShieldController {
     static let store = ManagedSettingsStore(named: .keyholder)
@@ -28,6 +37,29 @@ enum ShieldController {
         // Stops the app being deleted while a block is on. Only honoured while
         // Screen Time authorization stands.
         store.application.denyAppRemoval = true
+    }
+
+    /// Everything is shielded except the allowed apps. Keyholder itself is never
+    /// shielded: apps cannot shield themselves through their own store.
+    static func applyShields(allowing allowed: FamilyActivitySelection) {
+        store.shield.applications = nil
+        store.shield.applicationCategories = .all(except: allowed.applicationTokens)
+        store.application.denyAppRemoval = true
+    }
+
+    /// Re-applies whatever the user chose at Lock time, from the App Group.
+    /// Used by the app and by the monitor extension when an unlock window ends.
+    @discardableResult
+    static func applyStoredShields() -> Bool {
+        switch SharedStore.blockMode {
+        case .allExcept:
+            applyShields(allowing: SharedStore.allowedSelection ?? FamilyActivitySelection())
+            return true
+        case .selected:
+            guard let selection = SharedStore.selection else { return false }
+            applyShields(selection)
+            return true
+        }
     }
 
     /// Temporary unlock: apps open, but the app itself still cannot be deleted.

@@ -378,7 +378,7 @@ struct HeldKeyRow: View {
     }
 
     private func metaLine(_ block: Block, now: Date) -> String {
-        var parts = ["\(block.appCount) apps, \(block.categoryCount) categories", "\(held.requestsThisWeek) requests this week"]
+        var parts = [block.summary, "\(held.requestsThisWeek) requests this week"]
         if let endsAt = block.breakGlassEndsAt {
             parts.append("Broke the glass, ends in \(StreakState.format(max(0, endsAt.timeIntervalSince(now))))")
         }

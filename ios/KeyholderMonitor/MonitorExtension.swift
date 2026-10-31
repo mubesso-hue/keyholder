@@ -23,8 +23,8 @@ final class MonitorExtension: DeviceActivityMonitor {
         case .unlockWindow:
             SharedStore.unlockUntil = nil
             SharedStore.pendingShieldRequestAt = nil
-            if SharedStore.blockActive, let selection = SharedStore.selection {
-                ShieldController.applyShields(selection)
+            if SharedStore.blockActive {
+                ShieldController.applyStoredShields()
             }
             postHeartbeat()
 

@@ -71,10 +71,29 @@ final class SupabaseService {
         let pCategoryCount: Int
     }
 
-    func startBlock(coolingOffHours: Int, appCount: Int, categoryCount: Int) async throws -> Block {
-        try await client.rpc("start_block", params: StartBlockParams(
-            pCoolingOffHours: coolingOffHours, pAppCount: appCount, pCategoryCount: categoryCount
-        )).execute().value
+    private struct StartBlockAllExceptParams: Encodable {
+        let pCoolingOffHours: Int
+        let pAppCount: Int
+        let pCategoryCount: Int
+        let pMode: String
+        let pAllowedCount: Int
+    }
+
+    /// Selected mode sends only the original three arguments, so it works against
+    /// any server version. Everything-except mode needs migration 0004.
+    func startBlock(coolingOffHours: Int, mode: BlockMode, appCount: Int, categoryCount: Int,
+                    allowedCount: Int) async throws -> Block {
+        switch mode {
+        case .selected:
+            return try await client.rpc("start_block", params: StartBlockParams(
+                pCoolingOffHours: coolingOffHours, pAppCount: appCount, pCategoryCount: categoryCount
+            )).execute().value
+        case .allExcept:
+            return try await client.rpc("start_block", params: StartBlockAllExceptParams(
+                pCoolingOffHours: coolingOffHours, pAppCount: 0, pCategoryCount: 0,
+                pMode: mode.rawValue, pAllowedCount: allowedCount
+            )).execute().value
+        }
     }
 
     func lengthenCoolingOff(hours: Int) async throws -> Block {
