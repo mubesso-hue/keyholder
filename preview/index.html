@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keyholder preview</title>
+<style>
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --muted: #6e6e73; --line: #e5e5ea;
+    --tint: #0a84ff; --green: #34c759; --red: #ff3b30; --orange: #ff9500;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, Arial, sans-serif; background: #e9e9ee; color: var(--text); }
+  header { padding: 18px 24px 8px; }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; max-width: 860px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 24px 14px; font-size: 13px; }
+  .controls .group { display: flex; gap: 6px; align-items: center; background: #fff; border-radius: 10px; padding: 6px 8px; }
+  .controls button { font: inherit; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+  .controls button.on { background: var(--tint); color: #fff; border-color: var(--tint); }
+  .controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .stage { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; padding: 6px 16px 40px; }
+  .phone { width: 375px; height: 760px; background: #000; border-radius: 44px; padding: 12px; box-shadow: 0 20px 50px rgba(0,0,0,.25); position: relative; }
+  .screen { background: var(--bg); border-radius: 34px; height: 100%; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+  .statusbar { display: flex; justify-content: space-between; padding: 14px 24px 4px; font-size: 13px; font-weight: 600; }
+  .statusbar .who { color: var(--tint); }
+  .nav { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 20px 8px; }
+  .nav h2 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.5px; }
+  .content { flex: 1; overflow-y: auto; padding: 4px 16px 20px; }
+  .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row.between { justify-content: space-between; }
+  .headline { font-weight: 700; font-size: 16px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .small { font-size: 12px; }
+  .streak { font-size: 44px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .streak.compact { font-size: 24px; }
+  .record { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #eee; }
+  .badge.green { background: #e6f8ea; color: #1b7f3a; }
+  .badge.orange { background: #fff1dc; color: #a35a00; }
+  .badge.red { background: #ffe5e3; color: #b3261e; }
+  .btn { font: inherit; border: 0; border-radius: 12px; padding: 12px 14px; font-weight: 600; cursor: pointer; width: 100%; font-size: 15px; }
+  .btn.primary { background: var(--tint); color: #fff; }
+  .btn.secondary { background: #e8e8ed; color: var(--text); }
+  .btn.danger { background: var(--red); color: #fff; }
+  .btn.ghost { background: transparent; color: var(--tint); }
+  .btn.sm { padding: 8px 10px; font-size: 13px; width: auto; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btns { display: flex; gap: 8px; margin-top: 10px; }
+  .pill { background: #fff3f2; border: 1px solid #ffd6d2; border-radius: 12px; padding: 10px 12px; margin-top: 10px; }
+  .pill.blue { background: #eef5ff; border-color: #cfe3ff; }
+  .section-title { font-weight: 700; margin: 6px 4px 8px; font-size: 15px; }
+  .apps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .app { text-align: center; cursor: pointer; }
+  .app .icon { width: 54px; height: 54px; border-radius: 14px; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 22px; color: #fff; position: relative; }
+  .app .icon.blocked::after { content: "🔒"; position: absolute; right: -4px; bottom: -4px; font-size: 14px; background: #fff; border-radius: 50%; padding: 1px; }
+  .app span { font-size: 11px; }
+  .sheet { position: absolute; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; z-index: 5; }
+  .sheet .panel { background: var(--bg); width: 100%; border-radius: 22px 22px 34px 34px; max-height: 92%; overflow-y: auto; padding: 14px 16px 24px; }
+  .sheet .handle { width: 36px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 10px; }
+  .sheet h3 { margin: 4px 0 10px; font-size: 18px; text-align: center; }
+  .list { background: #fff; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+  .list .item { padding: 12px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 15px; }
+  .list .item:last-child { border-bottom: 0; }
+  .list .item.danger { color: var(--red); }
+  .list .item .muted { font-size: 13px; }
+  .seg { display: flex; background: #e3e3e8; border-radius: 9px; padding: 2px; margin: 8px 0 12px; }
+  .seg button { flex: 1; border: 0; background: transparent; padding: 7px; border-radius: 7px; font: inherit; cursor: pointer; }
+  .seg button.on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .shield { position: absolute; inset: 0; z-index: 6; background: rgba(10,10,12,.92); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; gap: 10px; }
+  .shield .lock { font-size: 54px; }
+  .shield h3 { margin: 0; font-size: 26px; }
+  .shield p { margin: 0 0 14px; color: #cfcfd4; }
+  .shield .btn.white { background: #fff; color: #000; }
+  .shield .btn.ghost { color: #fff; }
+  .banners { position: absolute; top: 44px; left: 10px; right: 10px; z-index: 8; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+  .banner { background: rgba(255,255,255,.96); border-radius: 14px; padding: 10px 12px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font-size: 13px; pointer-events: auto; animation: drop .25s ease-out; }
+  .banner .t { font-weight: 700; }
+  .banner .actions { display: flex; gap: 6px; margin-top: 8px; }
+  .banner .actions button { font: inherit; font-size: 12px; border: 1px solid var(--line); background: #f6f6f9; border-radius: 8px; padding: 5px 8px; cursor: pointer; }
+  .banner .x { float: right; color: var(--muted); cursor: pointer; }
+  @keyframes drop { from { transform: translateY(-12px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .toast { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 8px 14px; border-radius: 999px; font-size: 13px; z-index: 9; }
+  .legend { font-size: 12px; color: var(--muted); padding: 0 24px 24px; max-width: 900px; }
+  .legend b { color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Keyholder — interactive preview</h1>
+  <p>Two phones, one backend simulated in this page with the same rules as the real database. Marc is locked; Sarah holds his key. Speed up time to watch unlock windows expire and Break Glass complete.</p>
+</header>
+
+<div class="controls">
+  <div class="group">Time <span id="speed-btns"></span></div>
+  <div class="group"><button onclick="jump(3600e3)">+1 hour</button><button onclick="jump(86400e3)">+24 hours</button></div>
+  <div class="group"><label><input type="checkbox" id="mutual" onchange="resetAll()"> Mutual pact (Marc also holds Sarah's key)</label></div>
+  <div class="group"><button onclick="resetAll()">Reset</button></div>
+  <div class="group muted" id="clock"></div>
+</div>
+
+<div class="stage">
+  <div class="phone" id="phone-marc"></div>
+  <div class="phone" id="phone-sarah"></div>
+</div>
+
+<div class="legend">
+  <b>Things to try:</b> tap Instagram on Marc's phone before and after locking · ask for time from the shield, approve from Sarah's notification · give time unasked from Sarah's card · Break Glass, then cancel · Break Glass and jump +24 hours (with mutual pact on, watch Sarah's block lift and her streak go on grace) · lengthen time speed to see the streak and record tick.
+  <br><br>This page simulates the product rules. It is not the iOS build; Screen Time blocking, push notifications and Sign in with Apple only exist on a real device.
+</div>
+
+<script>
+// ---------------------------------------------------------------- time
+const sim = { t: Date.now(), speed: 1, last: performance.now() };
+const SPEEDS = [1, 60, 600, 3600];
+function setSpeed(s) { sim.speed = s; renderControls(); }
+function jump(ms) { sim.t += ms; tick(); render(); }
+function now() { return sim.t; }
+
+// ---------------------------------------------------------------- model (mirrors 0001_init.sql)
+const USERS = { marc: { id: 'marc', name: 'Marc' }, sarah: { id: 'sarah', name: 'Sarah' } };
+const APPS = [
+  { id: 'instagram', name: 'Instagram', color: '#d62976', glyph: '📷' },
+  { id: 'tiktok', name: 'TikTok', color: '#111', glyph: '🎵' },
+  { id: 'x', name: 'X', color: '#222', glyph: '✕' },
+  { id: 'youtube', name: 'YouTube', color: '#ff0000', glyph: '▶' },
+  { id: 'reddit', name: 'Reddit', color: '#ff4500', glyph: '👽' },
+  { id: 'safari', name: 'Safari', color: '#1f8ef1', glyph: '🧭' },
+  { id: 'messages', name: 'Messages', color: '#34c759', glyph: '💬' },
+  { id: 'phone', name: 'Phone', color: '#34c759', glyph: '📞' },
+];
+let S;
+const newStreak = () => ({ startedAt: null, paused: 0, pauseStart: null, pauseUntil: null, best: 0, graceUntil: null });
+const newUI = () => ({ sheet: null, lockStep: 1, selected: new Set(['instagram', 'tiktok', 'x']), coolingOff: 24, decideFor: null, shield: null, toast: null, bgConfirm: false });
+
+function resetAll() {
+  const mutual = document.getElementById('mutual').checked;
+  S = {
+    keys: [{ holder: 'sarah', locked: 'marc', status: 'active' }],
+    blocks: {},
+    streaks: { marc: newStreak(), sarah: newStreak() },
+    requests: [],
+    notifs: { marc: [], sarah: [] },
+    ui: { marc: newUI(), sarah: newUI() },
+    askedAt: { marc: null, sarah: null },
+    weekRequests: { marc: 0, sarah: 0 },
+  };
+  if (mutual) S.keys.push({ holder: 'marc', locked: 'sarah', status: 'active' });
+  render();
+}
+
+// streaks
+function streakSeconds(s, t = now()) {
+  if (!s.startedAt) return 0;
+  if (s.graceUntil && s.graceUntil <= t) return 0;
+  let sec = (t - s.startedAt) / 1000 - s.paused;
+  if (s.pauseStart) sec -= (Math.min(t, s.pauseUntil ?? t) - s.pauseStart) / 1000;
+  return Math.max(0, sec);
+}
+function streakSettle(u, t = now()) {
+  const s = S.streaks[u];
+  if (s.pauseUntil && s.pauseUntil <= t) { s.paused += (s.pauseUntil - s.pauseStart) / 1000; s.pauseStart = null; s.pauseUntil = null; }
+  if (s.graceUntil && s.graceUntil <= t) Object.assign(s, { startedAt: null, paused: 0, pauseStart: null, pauseUntil: null, graceUntil: null });
+}
+function streakPause(u, until, t = now()) {
+  streakSettle(u, t); const s = S.streaks[u]; if (!s.startedAt) return;
+  s.pauseStart = s.pauseStart ?? t; s.pauseUntil = Math.max(s.pauseUntil ?? until, until);
+}
+function streakReset(u, t = now()) {
+  streakSettle(u, t); const s = S.streaks[u];
+  s.best = Math.max(s.best, streakSeconds(s, t));
+  Object.assign(s, { startedAt: null, paused: 0, pauseStart: null, pauseUntil: null, graceUntil: null });
+}
+function streakStart(u, t = now()) {
+  streakSettle(u, t); const s = S.streaks[u];
+  if (s.startedAt && s.graceUntil && s.graceUntil > t && s.pauseStart && !s.pauseUntil) {
+    s.paused += (t - s.pauseStart) / 1000; s.pauseStart = null; s.pauseUntil = null; s.graceUntil = null;
+  } else {
+    Object.assign(s, { startedAt: t, paused: 0, pauseStart: null, pauseUntil: null, graceUntil: null });
+  }
+}
+function streakOrphan(u, t = now()) {
+  streakSettle(u, t); const s = S.streaks[u]; if (!s.startedAt) return;
+  s.best = Math.max(s.best, streakSeconds(s, t));
+  s.pauseStart = s.pauseStart ?? t; s.pauseUntil = null; s.graceUntil = t + 24 * 3600e3;
+}
+
+// keys / blocks
+const holderOf = (u) => S.keys.find(k => k.locked === u && k.status === 'active')?.holder ?? null;
+const heldBy = (h) => S.keys.filter(k => k.holder === h && k.status === 'active').map(k => k.locked);
+const activeBlock = (u) => (S.blocks[u] && S.blocks[u].status === 'active') ? S.blocks[u] : null;
+const isShielded = (u) => { const b = activeBlock(u); return !!b && !(b.unlockUntil && b.unlockUntil > now()); };
+const pendingRequest = (u) => S.requests.find(r => r.from === u && r.status === 'pending') ?? null;
+function notify(to, title, body, category, data = {}) { S.notifs[to].unshift({ id: Math.random(), title, body, category, data, at: now() }); S.notifs[to] = S.notifs[to].slice(0, 3); }
+
+function startBlock(u, apps, coolingOff) {
+  const h = holderOf(u); if (!h) return toast(u, 'Nobody holds your key');
+  S.blocks[u] = { status: 'active', apps: new Set(apps), coolingOff, startedAt: now(), unlockUntil: null, bgEndsAt: null };
+  streakStart(u);
+  notify(h, `${USERS[u].name} locked their phone`, `You hold the key. ${apps.size} apps blocked.`, 'BLOCK_STARTED');
+}
+function endBlock(u, reason) {
+  const b = activeBlock(u); if (!b) return;
+  b.status = 'ended'; b.reason = reason; b.unlockUntil = null; b.bgEndsAt = null;
+  S.requests.forEach(r => { if (r.from === u && r.status === 'pending') r.status = 'cancelled'; });
+  S.askedAt[u] = null;
+}
+function requestUnlock(u, minutes, source) {
+  const b = activeBlock(u); if (!b) return;
+  if (pendingRequest(u)) return;
+  const h = holderOf(u);
+  S.requests.push({ id: Math.random(), from: u, to: h, minutes, status: 'pending', at: now() });
+  S.weekRequests[u]++;
+  notify(h, `${USERS[u].name} is asking for time`, minutes ? `They are asking for ${minutes} minutes.` : 'They want to be unlocked.', 'UNLOCK_REQUEST', { from: u });
+}
+function applyDecision(req, decision, minutes) {
+  const u = req.from, hName = USERS[req.to].name, b = activeBlock(u);
+  if (decision === 'denied') { req.status = 'denied'; notify(u, `${hName} said no`, 'Your block stays on.', 'UNLOCK_DECIDED'); }
+  else if (decision === 'timed') {
+    req.status = 'approved'; const until = now() + minutes * 60e3; b.unlockUntil = until; streakPause(u, until);
+    S.askedAt[u] = null;
+    notify(u, `${hName} unlocked you`, `You have ${minutes} minutes. The block comes back on its own.`, 'UNLOCK_DECIDED');
+  } else if (decision === 'end') {
+    req.status = 'approved'; endBlock(u, 'holder_ended'); streakReset(u);
+    notify(u, `${hName} ended your block`, 'Your streak reset. Lock again whenever you want.', 'BLOCK_ENDED');
+  }
+}
+function decide(reqId, decision, minutes) { const r = S.requests.find(x => x.id === reqId); if (r && r.status === 'pending' && activeBlock(r.from)) applyDecision(r, decision, minutes); }
+function holderUnlock(h, u, decision, minutes) {
+  if (!activeBlock(u) || holderOf(u) !== h) return;
+  let r = pendingRequest(u);
+  if (!r) { r = { id: Math.random(), from: u, to: h, minutes: null, status: 'pending', at: now() }; S.requests.push(r); }
+  applyDecision(r, decision, minutes);
+}
+function startBreakGlass(u) {
+  const b = activeBlock(u); if (!b || b.bgEndsAt) return;
+  b.bgEndsAt = now() + b.coolingOff * 3600e3;
+  notify(holderOf(u), `${USERS[u].name} broke the glass`, `Their block ends in ${b.coolingOff} hours unless you unlock them sooner.`, 'BREAK_GLASS_STARTED');
+}
+function cancelBreakGlass(u) {
+  const b = activeBlock(u); if (!b || !b.bgEndsAt) return;
+  b.bgEndsAt = null; notify(holderOf(u), `${USERS[u].name} cancelled Break Glass`, 'Their block continues. Streak intact.', 'BREAK_GLASS_CANCELLED');
+}
+function completeBreakGlass(u) {
+  const b = activeBlock(u); if (!b || !b.bgEndsAt || b.bgEndsAt > now()) return;
+  const h = holderOf(u), name = USERS[u].name;
+  endBlock(u, 'break_glass'); streakReset(u);
+  S.keys.forEach(k => { if (k.status === 'active' && ((k.holder === h && k.locked === u) || (k.holder === u && k.locked === h))) k.status = 'ended'; });
+  if (activeBlock(h) && S.blocks[h] && holderOfWas(h, u)) {
+    endBlock(h, 'orphaned'); streakOrphan(h);
+    notify(h, 'Your block was lifted', `${name} broke glass, so nobody holds your key. Re-lock with a new keyholder within 24 hours to keep your streak.`, 'BLOCK_ENDED');
+  }
+  notify(h, `${name}'s block ended`, 'Break Glass completed. You no longer hold their key.', 'BREAK_GLASS_COMPLETED');
+  notify(u, 'Your block has ended', 'Break Glass completed. Your streak reset.', 'BLOCK_ENDED');
+}
+// In the simulation the partner's key was just ended above; remember that it existed.
+function holderOfWas(h, u) { return S.keys.some(k => k.holder === u && k.locked === h); }
+
+function tick() {
+  for (const u of Object.keys(USERS)) {
+    streakSettle(u);
+    const b = activeBlock(u);
+    if (b && b.unlockUntil && b.unlockUntil <= now()) b.unlockUntil = null;
+    if (b && b.bgEndsAt && b.bgEndsAt <= now()) completeBreakGlass(u);
+  }
+}
+
+// ---------------------------------------------------------------- formatting
+function fmt(sec) {
+  sec = Math.floor(sec); const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`; if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`; return `${m}m`;
+}
+const tm = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const dtm = (t) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function toast(u, msg) { S.ui[u].toast = msg; render(); setTimeout(() => { if (S.ui[u].toast === msg) { S.ui[u].toast = null; render(); } }, 1600); }
+
+// ---------------------------------------------------------------- UI actions
+function openSheet(u, sheet, extra) { Object.assign(S.ui[u], { sheet, ...extra }); render(); }
+function closeSheet(u) { S.ui[u].sheet = null; S.ui[u].bgConfirm = false; render(); }
+function toggleApp(u, id) { const s = S.ui[u].selected; s.has(id) ? s.delete(id) : s.add(id); render(); }
+function tapApp(u, id) {
+  const b = activeBlock(u);
+  if (b && b.apps.has(id) && isShielded(u)) { S.ui[u].shield = id; render(); }
+  else toast(u, `${APPS.find(a => a.id === id).name} opened`);
+}
+function shieldAsk(u) { S.askedAt[u] = now(); requestUnlock(u, null, 'shield'); S.ui[u].shield = null; render(); }
+function dismissNotif(u, id) { S.notifs[u] = S.notifs[u].filter(n => n.id !== id); render(); }
+function act(fn) { fn(); tick(); render(); }
+
+// ---------------------------------------------------------------- rendering
+function renderControls() {
+  document.getElementById('speed-btns').innerHTML = SPEEDS.map(s => `<button class="${sim.speed === s ? 'on' : ''}" onclick="setSpeed(${s})">${s === 1 ? '1×' : s === 60 ? '1 min/s' : s === 600 ? '10 min/s' : '1 h/s'}</button>`).join('');
+  document.getElementById('clock').textContent = 'Simulated time ' + dtm(now());
+}
+
+function streakView(s, compact) {
+  const cur = streakSeconds(s), rec = Math.max(s.best, cur);
+  const paused = s.pauseStart && s.pauseStart <= now() && (!s.pauseUntil || s.pauseUntil > now());
+  return `<div><div class="streak ${compact ? 'compact' : ''}">${fmt(cur)} ${paused ? '<span class="badge">⏸ paused</span>' : ''}</div><div class="record">Record ${fmt(rec)}</div></div>`;
+}
+
+function myCard(u) {
+  const b = activeBlock(u), h = holderOf(u), hName = h ? USERS[h].name : 'your keyholder', s = S.streaks[u];
+  if (b) {
+    const unlocked = b.unlockUntil && b.unlockUntil > now();
+    const pr = pendingRequest(u);
+    let html = `<div class="row between"><div class="headline">${unlocked ? `<span style="color:var(--green)">🔓 Unlocked until ${tm(b.unlockUntil)}</span>` : '🔒 Locked'}</div><span class="badge">${b.apps.size} apps</span></div>`;
+    html += `<div style="margin:10px 0 6px">${streakView(s, false)}</div>`;
+    html += `<div class="muted">${hName} holds the key.</div>`;
+    if (b.bgEndsAt) {
+      html += `<div class="pill"><div class="row"><span>⚠️</span><b>Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}</b></div><div class="muted small" style="margin:4px 0 8px">Your streak resets when it completes. Cancel any time before ${dtm(b.bgEndsAt)} to keep it.</div><button class="btn primary sm" onclick="act(()=>cancelBreakGlass('${u}'))">Cancel Break Glass</button></div>`;
+    }
+    html += `<div class="btns">`;
+    if (pr) html += `<div class="muted" style="flex:1;align-self:center">⏳ Asked ${hName}${pr.minutes ? ` for ${pr.minutes} min` : ''}. Waiting…</div>`;
+    else html += `<button class="btn primary" onclick="openSheet('${u}','request')">✋ Ask ${hName} for time</button>`;
+    if (!b.bgEndsAt) html += `<button class="btn secondary" style="width:auto" title="Break Glass" onclick="openSheet('${u}','breakglass')">…</button>`;
+    html += `</div>`;
+    return html;
+  }
+  if (h) {
+    let html = `<div class="headline">🔑 ${hName} holds your key</div>`;
+    if (s.graceUntil && s.graceUntil > now()) html += `<div style="margin:8px 0">${streakView(s, true)}</div><div class="muted" style="color:var(--orange)">Streak paused. Lock again before ${dtm(s.graceUntil)} to keep it.</div>`;
+    else html += `<div class="record" style="margin:6px 0">Record ${fmt(s.best)}</div>`;
+    html += `<div class="btns"><button class="btn primary" onclick="openSheet('${u}','lock',{lockStep:1})">🔒 Lock</button></div><div class="muted small" style="margin-top:8px">Once locked, only ${hName} can give you time.</div>`;
+    return html;
+  }
+  return `<div class="headline">🔑 Nobody holds your key yet</div><div class="muted" style="margin-top:6px">Invite a friend to hold your key, or enter the code they sent you. You cannot lock until someone can unlock you.</div>${s.best > 0 ? `<div class="record" style="margin-top:6px">Record ${fmt(s.best)}</div>` : ''}`;
+}
+
+function heldCard(h, u) {
+  const b = activeBlock(u), s = S.streaks[u], name = USERS[u].name, pr = pendingRequest(u);
+  let html = `<div class="row between"><div class="headline">${name}</div>`;
+  if (b) html += b.unlockUntil && b.unlockUntil > now() ? `<span class="badge green">Unlocked until ${tm(b.unlockUntil)}</span>` : `<span class="badge">🔒 Locked</span>`;
+  html += `</div>`;
+  if (b) {
+    html += `<div style="margin:8px 0">${streakView(s, true)}</div><div class="muted small">${b.apps.size} apps blocked. ${S.weekRequests[u]} requests this week.</div>`;
+    if (b.bgEndsAt) html += `<div class="pill"><span>⚠️</span> <b>Broke the glass. Block ends in ${fmt((b.bgEndsAt - now()) / 1000)}</b></div>`;
+    if (pr) {
+      html += `<div class="pill blue"><b>${pr.minutes ? `Asking for ${pr.minutes} min` : 'Asking for time'}</b><div class="btns" style="margin-top:8px"><button class="btn secondary sm" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',15))">15 min</button><button class="btn secondary sm" onclick="act(()=>decide(${JSON.stringify(pr.id)},'timed',60))">1 hour</button><button class="btn secondary sm" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">More…</button><span style="flex:1"></span><button class="btn secondary sm" style="color:var(--red)" onclick="act(()=>decide(${JSON.stringify(pr.id)},'denied'))">No</button></div></div>`;
+    } else {
+      html += `<div class="btns"><button class="btn secondary sm" onclick="openSheet('${h}','decide',{decideFor:'${u}'})">Give time…</button></div>`;
+    }
+  } else {
+    html += `<div class="muted" style="margin-top:6px">Not locked right now.</div>${s.best > 0 ? `<div class="muted small">Record ${fmt(s.best)}</div>` : ''}`;
+  }
+  return html;
+}
+
+function appGrid(u) {
+  const b = activeBlock(u);
+  return `<div class="section-title">Try opening an app</div><div class="card"><div class="apps">${APPS.map(a => `<div class="app" onclick="tapApp('${u}','${a.id}')"><div class="icon ${b && b.apps.has(a.id) && isShielded(u) ? 'blocked' : ''}" style="background:${a.color}">${a.glyph}</div><span>${a.name}</span></div>`).join('')}</div></div>`;
+}
+
+function sheet(u) {
+  const ui = S.ui[u], h = holderOf(u), hName = h ? USERS[h].name : 'your keyholder';
+  if (!ui.sheet) return '';
+  let inner = '';
+  if (ui.sheet === 'lock') {
+    if (ui.lockStep === 1) {
+      inner = `<h3>Choose apps</h3><div class="list">${APPS.filter(a => !['messages', 'phone'].includes(a.id)).map(a => `<div class="item" onclick="toggleApp('${u}','${a.id}')"><span>${a.glyph} ${a.name}</span><span>${ui.selected.has(a.id) ? '✅' : '○'}</span></div>`).join('')}</div><div class="muted small" style="margin-bottom:10px">Phone and Messages can never be blocked. On iOS this is Apple's own picker and the app never learns which apps you chose.</div><button class="btn primary" ${ui.selected.size ? '' : 'disabled'} onclick="S.ui['${u}'].lockStep=2;render()">Next</button><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+    } else {
+      inner = `<h3>Cooling-off</h3><div class="muted" style="margin-bottom:6px">If you ever need out without ${hName}, Break Glass ends the block after a wait. Choose the wait now, while you mean it.</div><div class="seg">${[12, 24, 48, 72].map(x => `<button class="${ui.coolingOff === x ? 'on' : ''}" onclick="S.ui['${u}'].coolingOff=${x};render()">${x === 12 ? '12 h' : (x / 24) + (x > 24 ? ' days' : ' day')}</button>`).join('')}</div><div class="muted small" style="margin-bottom:12px">↑ You can make it longer later, never shorter.<br>🔔 ${hName} is told the moment you break the glass.<br>↩︎ Cancel before it completes and your streak survives.</div><button class="btn primary" onclick="act(()=>{startBlock('${u}',S.ui['${u}'].selected,S.ui['${u}'].coolingOff);S.ui['${u}'].sheet=null})">🔒 Lock</button><button class="btn ghost" onclick="S.ui['${u}'].lockStep=1;render()">Back</button>`;
+    }
+  } else if (ui.sheet === 'request') {
+    const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
+    inner = `<h3>Ask ${hName}</h3><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="act(()=>{requestUnlock('${u}',${m},'app');S.ui['${u}'].sheet=null})"><span>${l}</span><span class="muted">${m} min</span></div>`).join('')}</div><div class="muted small" style="margin-bottom:10px">This is a suggestion. ${hName} picks the actual duration, and the block comes back on its own when it ends.</div><button class="btn ghost" onclick="closeSheet('${u}')">Cancel</button>`;
+  } else if (ui.sheet === 'decide') {
+    const t = ui.decideFor, pr = pendingRequest(t), b = activeBlock(t), tName = USERS[t].name;
+    const opts = [[15, '15 min'], [30, '30 min'], [60, '1 hour'], [restOfDay(), 'Rest of today']];
+    const run = (dec, m) => `act(()=>{${pr ? `decide(${JSON.stringify(pr.id)},'${dec}',${m})` : `holderUnlock('${u}','${t}','${dec}',${m})`};S.ui['${u}'].sheet=null})`;
+    inner = `<h3>${tName}</h3><div class="card" style="padding:12px"><div>${pr ? (pr.minutes ? `${tName} is asking for ${pr.minutes} minutes.` : `${tName} is asking for time.`) : `${tName} has not asked. You can still give time.`}</div><div class="muted small">${S.weekRequests[t]} requests this week.${b && b.bgEndsAt ? ` ⚠️ Break Glass ends in ${fmt((b.bgEndsAt - now()) / 1000)}.` : ''}</div></div><div class="section-title">Give time</div><div class="list">${opts.map(([m, l]) => `<div class="item" onclick="${run('timed', m)}"><span>${l}</span><span class="muted">${m} min</span></div>`).join('')}</div><div class="list"><div class="item danger" onclick="${run('end', 'null')}">End their block</div>${pr ? `<div class="item" onclick="${run('denied', 'null')}">Say no</div>` : ''}</div><div class="muted small" style="margin-bottom:10px">Ending the block resets their streak. Their record is kept.</div><button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
+  } else if (ui.sheet === 'breakglass') {
+    const b = activeBlock(u); const hrs = b ? b.coolingOff : 24; const ends = now() + hrs * 3600e3;
+    const mutual = S.keys.some(k => k.status === 'active' && k.holder === u && k.locked === h) && !!activeBlock(h);
+    inner = `<h3>⚠️ Break Glass</h3><div class="card" style="font-size:14px;line-height:1.5">⏱ Your block ends at ${dtm(ends)}, in ${hrs} hours.<br>🔔 ${hName} is told right now, and again when it completes.<br>🔥 Your streak resets when it completes. Your record stays.<br>↩︎ Cancel any time before then and nothing is lost.<br>✋ ${hName} can cut the wait short by unlocking you.${mutual ? `<br>👥 You are in a mutual pact. Completing this also lifts ${hName}'s block.` : ''}</div>${ui.bgConfirm ? `<div class="muted" style="text-align:center;margin-bottom:8px">Start the ${hrs} hour wait? ${hName} will be notified immediately.</div><button class="btn danger" onclick="act(()=>{startBreakGlass('${u}');S.ui['${u}'].sheet=null;S.ui['${u}'].bgConfirm=false})">Yes, break the glass</button>` : `<button class="btn danger" onclick="S.ui['${u}'].bgConfirm=true;render()">Break the glass</button>`}<button class="btn ghost" onclick="closeSheet('${u}')">Close</button>`;
+  }
+  return `<div class="sheet" onclick="if(event.target===this)closeSheet('${u}')"><div class="panel"><div class="handle"></div>${inner}</div></div>`;
+}
+function restOfDay() { const d = new Date(now()); const mid = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(); return Math.min(1440, Math.max(15, Math.floor((mid - now()) / 60e3))); }
+
+function shieldView(u) {
+  const ui = S.ui[u]; if (!ui.shield) return '';
+  const h = holderOf(u), hName = h ? USERS[h].name : 'your keyholder', b = activeBlock(u);
+  const asked = S.askedAt[u] && now() - S.askedAt[u] < 3600e3;
+  const sub = b && b.bgEndsAt ? `Break Glass ends ${dtm(b.bgEndsAt)}. Until then, ask ${hName}.` : asked ? `You asked ${hName}. Waiting for an answer.` : `Ask ${hName} for time.`;
+  return `<div class="shield"><div class="lock">🔒</div><h3>Blocked</h3><p>${sub}</p><button class="btn white" ${asked ? 'disabled' : ''} onclick="shieldAsk('${u}')">${asked ? 'Asked' : `Ask ${hName}`}</button><button class="btn ghost" onclick="S.ui['${u}'].shield=null;render()">Not now</button><div class="muted small" style="color:#9a9aa0;margin-top:14px">On iOS this screen is drawn by Apple's shield extension; the button sends the request without opening the app.</div></div>`;
+}
+
+function banners(u) {
+  return `<div class="banners">${S.notifs[u].map(n => {
+    const req = n.category === 'UNLOCK_REQUEST' ? pendingRequest(n.data.from) : null;
+    return `<div class="banner"><span class="x" onclick="dismissNotif('${u}',${JSON.stringify(n.id)})">✕</span><div class="t">${esc(n.title)}</div><div>${esc(n.body)}</div>${req ? `<div class="actions"><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',15));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 15 min</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'timed',60));dismissNotif('${u}',${JSON.stringify(n.id)})">Give 1 hour</button><button onclick="act(()=>decide(${JSON.stringify(req.id)},'denied'));dismissNotif('${u}',${JSON.stringify(n.id)})">Say no</button></div>` : ''}</div>`;
+  }).join('')}</div>`;
+}
+
+function phone(u) {
+  const held = heldBy(u);
+  return `<div class="screen">${banners(u)}<div class="statusbar"><span>${tm(now())}</span><span class="who">${USERS[u].name}'s iPhone</span></div><div class="nav"><h2>Keyholder</h2><span class="muted">⚙︎</span></div><div class="content"><div class="card">${myCard(u)}</div>${held.length ? `<div class="section-title">Keys you hold</div>${held.map(x => `<div class="card">${heldCard(u, x)}</div>`).join('')}` : ''}${appGrid(u)}</div>${sheet(u)}${shieldView(u)}${S.ui[u].toast ? `<div class="toast">${esc(S.ui[u].toast)}</div>` : ''}</div>`;
+}
+
+function render() {
+  renderControls();
+  document.getElementById('phone-marc').innerHTML = phone('marc');
+  document.getElementById('phone-sarah').innerHTML = phone('sarah');
+}
+
+// ---------------------------------------------------------------- loop
+resetAll();
+setInterval(() => {
+  const t = performance.now(); sim.t += (t - sim.last) * sim.speed; sim.last = t;
+  tick(); render();
+}, 1000);
+</script>
+</body>
+</html>

@@ -24,8 +24,10 @@ do $$ begin
 end $$;
 SQL
 
-echo "== applying migration"
-psql -v ON_ERROR_STOP=1 -d "$DB" -q -f supabase/migrations/0001_init.sql
+for f in supabase/migrations/*.sql; do
+  echo "== applying $f"
+  psql -v ON_ERROR_STOP=1 -d "$DB" -q -f "$f"
+done
 
 echo "== running scenario"
 psql -v ON_ERROR_STOP=1 -d "$DB" -q -f scripts/test_scenario.sql

@@ -270,6 +270,7 @@ select pg_temp.ok((select count(*) from public.blocks where user_id = :'sarah') 
 select pg_temp.ok((select count(*) from public.profiles) = 2, 'rls: self plus related only');
 select pg_temp.assert_raises('select public.cron_tick()', 'permission denied');
 select pg_temp.assert_raises($$select public.device_event('x', 'heartbeat', '{}')$$, 'permission denied');
+select pg_temp.assert_raises('select public.notify_send_push()', 'permission denied');
 reset role;
 
 select 'scenario ok';
