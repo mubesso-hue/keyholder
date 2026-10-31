@@ -88,6 +88,5 @@ struct RecordStat: View {
             TrackedLabel(text: "RECORD")
         }
         .legibleOnPhoto()
-        .scrim()
     }
 }

@@ -31,37 +31,46 @@ struct LandscapeBackground: View {
         GeometryReader { geo in
             ZStack {
                 if let image = UIImage(named: imageName) {
+                    // 1. The scene, full-bleed.
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
-                    photoOverlays(size: geo.size)
+                    // 2. The same scene blurred, faded in over the lower half, so the
+                    //    record and actions sit on frosted scenery, not busy detail.
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .blur(radius: 26)
+                        .saturation(1.15)
+                        .scaleEffect(1.12)
+                        .clipped()
+                        .mask(
+                            LinearGradient(stops: [
+                                .init(color: .clear, location: 0.46),
+                                .init(color: .black, location: 0.70),
+                            ], startPoint: .top, endPoint: .bottom)
+                        )
+                    // 3. One continuous tonal gradient: deeper at the top for the
+                    //    header and headline, lightest around the Lock, deep at the bottom.
+                    LinearGradient(stops: [
+                        .init(color: Theme.ink.opacity(0.58), location: 0.00),
+                        .init(color: Theme.ink.opacity(0.42), location: 0.18),
+                        .init(color: Theme.ink.opacity(0.28), location: 0.34),
+                        .init(color: Theme.ink.opacity(0.14), location: 0.46),
+                        .init(color: Theme.ink.opacity(0.14), location: 0.54),
+                        .init(color: Theme.ink.opacity(0.36), location: 0.66),
+                        .init(color: Theme.ink.opacity(0.72), location: 0.84),
+                        .init(color: Theme.ink.opacity(0.88), location: 1.00),
+                    ], startPoint: .top, endPoint: .bottom)
                 } else {
                     GradientDusk()
                 }
             }
         }
         .ignoresSafeArea()
-    }
-
-    /// Light touch so the scenery stays visible: a short dark strip behind the
-    /// header and a gradient behind the record and the bottom edge. Type gets
-    /// its own soft shadow in HeroView.
-    @ViewBuilder
-    private func photoOverlays(size: CGSize) -> some View {
-        VStack(spacing: 0) {
-            LinearGradient(colors: [Theme.ink.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom)
-                .frame(height: size.height * 0.22)
-            Spacer()
-            LinearGradient(stops: [
-                .init(color: .clear, location: 0),
-                .init(color: Theme.ink.opacity(0.55), location: 0.52),
-                .init(color: Theme.ink.opacity(0.9), location: 1),
-            ], startPoint: .top, endPoint: .bottom)
-            .frame(height: size.height * 0.42)
-        }
-        .frame(width: size.width, height: size.height)
     }
 }
 

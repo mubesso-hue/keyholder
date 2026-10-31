@@ -5,8 +5,8 @@ enum Theme {
     static let ink = Color(hex: 0x0A0A0A)
     /// Secondary type. Over the photo backgrounds 60% white washes out on bright
     /// skies, so this sits at 90% and the label tone at 72%.
-    static let white60 = Color.white
-    static let white40 = Color.white.opacity(0.8)
+    static let white60 = Color.white.opacity(0.9)
+    static let white40 = Color.white.opacity(0.72)
     static let white15 = Color.white.opacity(0.15)
     static let white08 = Color.white.opacity(0.08)
 
@@ -92,28 +92,11 @@ struct GlassPillStyle: ButtonStyle {
 }
 
 extension View {
-    /// Shadows so white type stays readable over bright scenery.
+    /// Hairline shadow so white type holds on the lighter parts of a scene.
     func legibleOnPhoto() -> some View {
         self
-            .shadow(color: .black.opacity(0.6), radius: 1, y: 1)
-            .shadow(color: .black.opacity(0.55), radius: 5, y: 2)
-            .shadow(color: .black.opacity(0.5), radius: 20)
-    }
-
-    /// A soft dark halo behind a block of text. The scenery stays visible
-    /// everywhere else; only the words get a little shade.
-    func scrim() -> some View {
-        self
-            .padding(.horizontal, 90)
-            .padding(.vertical, 30)
-            .background(
-                RadialGradient(
-                    colors: [Theme.ink.opacity(0.62), Theme.ink.opacity(0.38), .clear],
-                    center: .center, startRadius: 0, endRadius: 230
-                )
-            )
-            .padding(.horizontal, -90)
-            .padding(.vertical, -30)
+            .shadow(color: .black.opacity(0.28), radius: 1, y: 1)
+            .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
     }
 }
 
