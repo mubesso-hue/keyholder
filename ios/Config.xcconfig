@@ -4,7 +4,7 @@
 // NOTE: `//` starts a comment in xcconfig, so URLs need the $() trick below.
 
 // Your Apple developer team id (Apple Developer › Membership).
-DEVELOPMENT_TEAM = ABCDE12345
+DEVELOPMENT_TEAM = JSHZXWR2B4
 
 APP_BUNDLE_ID = com.keyholder.app
 APP_GROUP_ID = group.com.keyholder.app
