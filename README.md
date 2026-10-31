@@ -86,7 +86,7 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres scripts/test_schema.sh
 
 1. `brew install xcodegen`
 2. Edit `ios/Config.xcconfig`: team id, bundle id, app group, Supabase URL and anon key.
-   Keep the `https:$()//` form, since `//` starts a comment in xcconfig.
+   Keep the `https:$(SLASH)$(SLASH)` form, since `//` starts a comment in xcconfig.
 3. ```bash
    cd ios && xcodegen generate && open Keyholder.xcodeproj
    ```
