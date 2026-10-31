@@ -28,7 +28,7 @@ final class SupabaseService {
     var currentUserID: UUID? { client.auth.currentUser?.id }
 
     func signInWithApple(idToken: String, nonce: String) async throws {
-        try await client.auth.signInWithIdToken(
+        _ = try await client.auth.signInWithIdToken(
             credentials: OpenIDConnectCredentials(provider: .apple, idToken: idToken, nonce: nonce)
         )
     }

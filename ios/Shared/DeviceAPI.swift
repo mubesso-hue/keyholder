@@ -40,7 +40,8 @@ enum DeviceAPI {
         return true
     }
 
-    static func post(_ type: EventType, payload: [String: Any] = [:]) async -> Bool {
+    /// Async variant for callers that want to wait for the result.
+    static func send(_ type: EventType, payload: [String: Any] = [:]) async -> Bool {
         await withCheckedContinuation { continuation in
             let started = post(type, payload: payload) { ok in continuation.resume(returning: ok) }
             if !started { continuation.resume(returning: false) }
