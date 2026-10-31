@@ -94,14 +94,25 @@ PGHOST=localhost PGPORT=5432 PGUSER=postgres scripts/test_schema.sh
 5. Two phones, two Apple IDs, one invite. Lock one, request from the shield,
    approve from the other's lock screen.
 
+## 4. TestFlight
+
+`.github/workflows/testflight.yml` archives, signs and uploads on demand
+(Actions › TestFlight › Run workflow). It needs six repository secrets, listed at
+the top of that file: your team id, an App Store Connect API key (id, issuer,
+.p8 contents) and an Apple Distribution certificate as a base64 .p12 with its
+password. Provisioning profiles are created on the fly by Xcode through the API
+key, so nothing else is stored. Family Controls (Distribution) must be enabled on
+the app id and the three extension ids first.
+
 ## What has and has not been verified
 
 - The SQL schema, every RPC, RLS and the cron tick are exercised end to end by
-  `scripts/test_schema.sh` against Postgres 16.
-- The two edge functions type-check against a Deno shim.
-- The Swift code was written without Xcode available and **has not been compiled**.
-  Expect a short round of fixes on first build, most likely around the
-  supabase-swift API surface (`SupabaseService.swift`) and SwiftUI bindings.
+  `scripts/test_schema.sh` against Postgres 16, locally and in CI.
+- The two edge functions type-check (CI) and are deployed; probed live.
+- The iOS app and all three extensions **compile cleanly** with Xcode 16 on the
+  `iOS build` workflow (simulator SDK, unsigned).
+- Not yet verified: running on a physical iPhone. Screen Time, the shield,
+  push and Sign in with Apple only work on a device signed with your team.
 
 ## Known limits of v1
 
