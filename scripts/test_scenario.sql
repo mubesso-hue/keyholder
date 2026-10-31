@@ -280,6 +280,70 @@ select mode as tom_mode, allowed_count as tom_allowed from public.start_block(24
 select pg_temp.ok(:'tom_mode' = 'all_except' and :tom_allowed = 5, 'all_except block stores mode and allowed count');
 select pg_temp.ok((select body like '%Everything is blocked except 5 apps.%' from public.notifications where category = 'BLOCK_STARTED' order by id desc limit 1), 'holder told everything except 5 apps');
 select pg_temp.assert_raises('select public.start_block(24, 0, 0)', 'already locked');
+select id as tom_block from public.blocks where user_id = :'tom' and status = 'active' \gset
+
+-- Changing apps while locked -----------------------------------------------------
+-- Stricter changes are reported straight away.
+select allowed_count as tom_allowed2 from public.update_block_apps(0, 0, 4) \gset
+select pg_temp.ok(:tom_allowed2 = 4, 'stricter change updates the block size');
+select pg_temp.ok((select count(*) from public.events where block_id = :'tom_block' and type = 'apps_changed') = 1, 'stricter change logged');
+
+-- Opening apps up is a request to the keyholder.
+select pg_temp.assert_raises('select public.request_app_change(0, 0, 0, 0, 4)', 'nothing to open up');
+select id as change1, kind as change1_kind from public.request_app_change(2, 0, 0, 0, 6) \gset
+select pg_temp.ok(:'change1_kind' = 'apps', 'app change stored as kind apps');
+select pg_temp.ok((select (change ->> 'opened_apps')::int = 2 and change ->> 'mode' = 'all_except' from public.unlock_requests where id = :'change1'), 'app change records what opens');
+select pg_temp.ok((select user_id = :'marc' and body = 'They are asking to keep 2 more apps open.'
+                     from public.notifications where category = 'APP_CHANGE_REQUEST' order by id desc limit 1), 'holder asked to keep 2 more apps open');
+select pg_temp.ok(public._fmt_opened('selected', 1, 1) = 'unblock 1 app and 1 category', 'selected-mode wording');
+select pg_temp.ok(public._fmt_opened('selected', 0, 3) = 'unblock 3 categories', 'selected-mode wording, categories only');
+select pg_temp.ok(public._fmt_opened('all_except', 1, 1) = 'keep 1 more app and 1 more category open', 'all-except wording with a category');
+
+-- A request for time is separate and not swallowed by the app change.
+select id as tom_time_req from public.request_unlock(80) \gset
+select pg_temp.ok(:'tom_time_req' <> :'change1', 'time request is separate from the app change');
+select pg_temp.ok((select body = 'They are asking for 1 h 20 min.' from public.notifications where category = 'UNLOCK_REQUEST' order by id desc limit 1), 'time request reads 1 h 20 min');
+select public.me_snapshot() as tom_snap \gset
+select pg_temp.ok((:'tom_snap'::jsonb) -> 'my_pending_request' ->> 'id' = :'tom_time_req', 'snapshot: pending time request');
+select pg_temp.ok((:'tom_snap'::jsonb) -> 'my_app_change' ->> 'status' = 'pending', 'snapshot: pending app change');
+
+select pg_temp.as_user(:'marc');
+select public.me_snapshot() as marc_snap \gset
+select pg_temp.ok((select (h -> 'pending_app_change' ->> 'id') = :'change1' and (h -> 'pending_request' ->> 'id') = :'tom_time_req'
+                     from jsonb_array_elements((:'marc_snap'::jsonb) -> 'held') h
+                    where h -> 'profile' ->> 'id' = :'tom'), 'holder snapshot shows both requests');
+select pg_temp.assert_raises($$select public.decide_unlock('$$ || :'change1' || $$', 'approved_timed', 30)$$, 'not a request for time');
+
+select pg_temp.as_user(:'sarah');
+select pg_temp.assert_raises($$select public.decide_app_change('$$ || :'change1' || $$', true)$$, 'not your key');
+
+select pg_temp.as_user(:'marc');
+select status as change1_status from public.decide_app_change(:'change1', true) \gset
+select pg_temp.ok(:'change1_status' = 'approved', 'holder approves the app change');
+select pg_temp.ok((select user_id = :'tom' and (data ->> 'approved')::boolean
+                     from public.notifications where category = 'APP_CHANGE_DECIDED' order by id desc limit 1), 'locked person told it was approved');
+select pg_temp.ok((select status = 'pending' from public.unlock_requests where id = :'tom_time_req'), 'time request still waiting');
+select pg_temp.assert_raises($$select public.decide_app_change('$$ || :'change1' || $$', false)$$, 'already decided');
+select pg_temp.assert_raises($$select public.decide_app_change('$$ || :'tom_time_req' || $$', true)$$, 'not an app change');
+
+-- Giving time folds the time request, never an app change.
+select id as folded from public.holder_unlock(:'tom', 'approved_timed', 60) \gset
+select pg_temp.ok(:'folded' = :'tom_time_req', 'holder_unlock folds the time request');
+select pg_temp.ok((select body = 'You have 1 h. The block comes back on its own.' from public.notifications where category = 'UNLOCK_DECIDED' order by id desc limit 1), 'approval reads 1 h');
+
+-- A new app change replaces the previous one; withdrawing cancels it.
+select pg_temp.as_user(:'tom');
+select id as change2 from public.request_app_change(1, 0, 0, 0, 5) \gset
+select id as change3 from public.request_app_change(3, 0, 0, 0, 7) \gset
+select pg_temp.ok((select status = 'cancelled' from public.unlock_requests where id = :'change2'), 'newer app change replaces the older one');
+select public.cancel_app_change();
+select pg_temp.ok((select status = 'cancelled' from public.unlock_requests where id = :'change3'), 'withdrawn app change is cancelled');
+select pg_temp.ok((public.me_snapshot() -> 'my_app_change' ->> 'id') = :'change3', 'snapshot reports the latest app change');
+
+select pg_temp.as_user(:'marc');
+select pg_temp.assert_raises($$select public.decide_app_change('$$ || :'change3' || $$', true)$$, 'already decided');
+select pg_temp.assert_raises('select public.request_app_change(1, 0, 0, 0, 1)', 'not locked');
+select pg_temp.assert_raises('select public.update_block_apps(0, 0, 1)', 'not locked');
 
 -- Unauthenticated callers are rejected.
 select pg_temp.as_nobody();
@@ -295,6 +359,10 @@ select pg_temp.ok((select count(*) from public.profiles) = 3, 'rls: self plus re
 select pg_temp.assert_raises('select public.cron_tick()', 'permission denied');
 select pg_temp.assert_raises($$select public.device_event('x', 'heartbeat', '{}')$$, 'permission denied');
 select pg_temp.assert_raises('select public.notify_send_push()', 'permission denied');
+select pg_temp.assert_raises($$select public._fmt_opened('selected', 1, 0)$$, 'permission denied');
+select pg_temp.as_user(:'marc');
+select pg_temp.ok((select count(*) from public.unlock_requests where kind = 'apps' and requester_id = :'tom') = 3, 'rls: holder reads app changes');
+select public.cancel_app_change();
 reset role;
 
 select 'scenario ok';

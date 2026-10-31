@@ -38,6 +38,18 @@ final class ScreenTimeController: ObservableObject {
     /// Number of apps kept open in everything-except mode.
     var allowedCount: Int { allowedSelection.applicationTokens.count }
 
+    /// Replaces the selection for a mode while locked, without touching the mode.
+    func setSelection(_ newValue: FamilyActivitySelection, for mode: BlockMode) {
+        switch mode {
+        case .selected:
+            selection = newValue
+            SharedStore.selection = newValue
+        case .allExcept:
+            allowedSelection = newValue
+            SharedStore.allowedSelection = newValue
+        }
+    }
+
     func persistSelection() {
         SharedStore.selection = selection
         SharedStore.allowedSelection = allowedSelection

@@ -80,6 +80,30 @@ struct DecideRequestSheet: View {
                     }
                 }
 
+                if let change = held.pendingAppChange {
+                    Section {
+                        Text("\(held.profile.displayName) wants to \(change.change?.request ?? "change their blocked apps").")
+                        Button("Approve") {
+                            Task {
+                                await state.decideAppChange(requestID: change.id, approve: true)
+                                dismiss()
+                            }
+                        }
+                        .disabled(state.busy)
+                        Button("Say no") {
+                            Task {
+                                await state.decideAppChange(requestID: change.id, approve: false)
+                                dismiss()
+                            }
+                        }
+                        .disabled(state.busy)
+                    } header: {
+                        Text("App change")
+                    } footer: {
+                        Text("Apple keeps their apps private, so you see how many, not which. Blocking more never needs your OK.")
+                    }
+                }
+
                 Section("Give time") {
                     ForEach(UnlockDuration.presets) { duration in
                         Button(duration.label) {

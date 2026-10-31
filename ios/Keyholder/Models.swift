@@ -77,6 +77,45 @@ enum RequestDecision: String, Codable {
     case denied
 }
 
+enum RequestKind: String, Codable {
+    /// Asking for time out of the block.
+    case time
+    /// Asking to open up apps that are blocked.
+    case apps
+}
+
+/// What an app change asks for. Counts only: Apple keeps the apps themselves
+/// private on the locked person's phone.
+struct AppChange: Codable, Equatable {
+    let mode: String?
+    let openedApps: Int?
+    let openedCategories: Int?
+    let appCount: Int?
+    let categoryCount: Int?
+    let allowedCount: Int?
+
+    /// "keep 2 more apps open", "unblock 1 app and 1 category".
+    var request: String {
+        let apps = openedApps ?? 0, categories = openedCategories ?? 0
+        if mode == BlockMode.allExcept.rawValue {
+            let parts = [
+                apps > 0 ? "\(apps) more \(apps == 1 ? "app" : "apps")" : nil,
+                categories > 0 ? "\(categories) more \(categories == 1 ? "category" : "categories")" : nil,
+            ].compactMap { $0 }
+            return "keep \(parts.joined(separator: " and ")) open"
+        }
+        return "unblock \(AppChange.describe(apps: apps, categories: categories))"
+    }
+
+    /// "2 apps and 1 category".
+    static func describe(apps: Int, categories: Int) -> String {
+        [
+            apps > 0 ? "\(apps) \(apps == 1 ? "app" : "apps")" : nil,
+            categories > 0 ? "\(categories) \(categories == 1 ? "category" : "categories")" : nil,
+        ].compactMap { $0 }.joined(separator: " and ")
+    }
+}
+
 struct UnlockRequest: Codable, Identifiable, Equatable {
     let id: UUID
     let blockId: UUID
@@ -89,6 +128,11 @@ struct UnlockRequest: Codable, Identifiable, Equatable {
     let unlockUntil: Date?
     let createdAt: Date
     let decidedAt: Date?
+    /// Optional so rows from before migration 0005 decode as time requests.
+    let kind: RequestKind?
+    let change: AppChange?
+
+    var isAppChange: Bool { kind == .apps }
 }
 
 struct Keyholder: Codable, Equatable {
@@ -103,6 +147,8 @@ struct HeldKey: Codable, Identifiable, Equatable {
     let block: Block?
     let streak: StreakState?
     let pendingRequest: UnlockRequest?
+    /// A pending request to open up apps, separate from any request for time.
+    let pendingAppChange: UnlockRequest?
     let requestsThisWeek: Int
 
     var id: UUID { key.id }
@@ -116,6 +162,8 @@ struct Snapshot: Codable, Equatable {
     let block: Block?
     let keyholder: Keyholder?
     let myPendingRequest: UnlockRequest?
+    /// My latest app change for the current block, whatever its status.
+    let myAppChange: UnlockRequest?
     let held: [HeldKey]
 }
 

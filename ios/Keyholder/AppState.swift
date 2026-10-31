@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import FamilyControls
 import Supabase
 
 /// Single source of truth for the UI. Talks to SupabaseService, keeps the
@@ -11,7 +12,7 @@ final class AppState: ObservableObject {
     enum Phase: Equatable { case loading, signedOut, signedIn }
 
     enum Sheet: Identifiable {
-        case lock, request, breakGlass, invite, settings
+        case lock, request, breakGlass, invite, settings, editApps
         case accept(code: String?)
         case decide(HeldKey)
 
@@ -22,6 +23,7 @@ final class AppState: ObservableObject {
             case .breakGlass: return "breakGlass"
             case .invite: return "invite"
             case .settings: return "settings"
+            case .editApps: return "editApps"
             case .accept: return "accept"
             case .decide(let held): return "decide-\(held.id)"
             }
@@ -112,6 +114,7 @@ final class AppState: ObservableObject {
             let snap = try await api.snapshot()
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
+            settlePendingAppChange(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
             scheduleLocalTimers(for: snap.block)
             await checkAuthorizationAndHeartbeat(block: snap.block)
@@ -175,10 +178,47 @@ final class AppState: ObservableObject {
 
     private var revocationCheckInFlight = false
 
+    /// Applies an app change the keyholder approved, or drops one that was
+    /// declined, withdrawn, expired or belongs to an earlier block. Runs before
+    /// the shields are reconciled so an approval takes effect in the same pass.
+    private func settlePendingAppChange(_ snap: Snapshot) {
+        guard let pending = SharedStore.pendingAppChange else { return }
+        guard let block = snap.block, block.isActive, block.id.uuidString == pending.blockID,
+              pending.mode == SharedStore.blockMode else {
+            SharedStore.pendingAppChange = nil
+            return
+        }
+        guard let change = snap.myAppChange, change.id == pending.requestID else {
+            // A snapshot fetched just before the request was made doesn't show it
+            // yet. Only a newer request replaces this one.
+            if let newer = snap.myAppChange, newer.createdAt > pending.createdAt {
+                SharedStore.pendingAppChange = nil
+            }
+            return
+        }
+        switch change.status {
+        case .pending:
+            return
+        case .approved:
+            let current = SharedStore.selection(for: pending.mode)
+            let updated = AppChangePlan.applying(pending.opened, to: current, mode: pending.mode)
+            screenTime.setSelection(updated, for: pending.mode)
+            SharedStore.pendingAppChange = nil
+            let size = AppChangePlan.blockSize(updated, mode: pending.mode)
+            Task { [weak self] in
+                _ = try? await self?.api.updateBlockApps(appCount: size.appCount, categoryCount: size.categoryCount,
+                                                         allowedCount: size.allowedCount)
+            }
+        case .denied, .cancelled, .expired:
+            SharedStore.pendingAppChange = nil
+        }
+    }
+
     private func refreshSilently() async {
         if let snap = try? await api.snapshot() {
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
+            settlePendingAppChange(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
         }
     }
@@ -236,6 +276,84 @@ final class AppState: ObservableObject {
     func holderUnlock(_ held: HeldKey, decision: RequestDecision, duration: UnlockDuration? = nil) async {
         let minutes = duration?.minutes(now: serverNow)
         await run { _ = try await self.api.holderUnlock(lockedID: held.profile.id, decision: decision, minutes: minutes) }
+    }
+
+    // MARK: Changing apps while locked
+
+    /// The editor's starting point: the apps in force, with any change still
+    /// waiting for the keyholder shown as if approved.
+    func appEditorStart() -> (mode: BlockMode, current: FamilyActivitySelection, start: FamilyActivitySelection) {
+        let mode = SharedStore.blockMode
+        let current = SharedStore.selection(for: mode)
+        guard let pending = pendingAppChange, pending.mode == mode else { return (mode, current, current) }
+        return (mode, current, AppChangePlan.applying(pending.opened, to: current, mode: mode))
+    }
+
+    /// The local half of a pending app change, if the server still shows it pending.
+    var pendingAppChange: PendingAppChange? {
+        guard let local = SharedStore.pendingAppChange,
+              let remote = snapshot?.myAppChange, remote.id == local.requestID, remote.status == .pending
+        else { return nil }
+        return local
+    }
+
+    /// Saves an edit made while locked. Stricter parts apply right away; anything
+    /// that opens apps up goes to the keyholder, replacing an earlier request.
+    @discardableResult
+    func saveAppChange(_ draft: FamilyActivitySelection) async -> Bool {
+        guard let block = snapshot?.block, block.isActive else { return false }
+        let mode = SharedStore.blockMode
+        let plan = AppChangePlan(mode: mode, current: SharedStore.selection(for: mode), draft: draft)
+        let pending = pendingAppChange
+
+        busy = true
+        defer { busy = false }
+        do {
+            if plan.tightensAnything {
+                screenTime.setSelection(plan.immediate, for: mode)
+                if !block.isTemporarilyUnlocked(at: serverNow) {
+                    ShieldController.applyStoredShields()
+                }
+                let size = AppChangePlan.blockSize(plan.immediate, mode: mode)
+                _ = try await api.updateBlockApps(appCount: size.appCount, categoryCount: size.categoryCount,
+                                                  allowedCount: size.allowedCount)
+            }
+
+            if plan.opensAnything {
+                let unchanged = pending.map { AppChangePlan.same($0.opened, plan.opened) } ?? false
+                if !unchanged {
+                    let opened = AppChangePlan.counts(plan.opened)
+                    let size = AppChangePlan.blockSize(plan.proposed, mode: mode)
+                    let request = try await api.requestAppChange(
+                        openedApps: opened.apps, openedCategories: opened.categories,
+                        appCount: size.appCount, categoryCount: size.categoryCount, allowedCount: size.allowedCount)
+                    SharedStore.pendingAppChange = PendingAppChange(
+                        requestID: request.id, createdAt: request.createdAt, blockID: block.id.uuidString,
+                        mode: mode, opened: plan.opened)
+                }
+            } else if pending != nil {
+                try await api.cancelAppChange()
+                SharedStore.pendingAppChange = nil
+            }
+            await refresh()
+            return true
+        } catch {
+            errorMessage = error.userMessage
+            await refresh()
+            return false
+        }
+    }
+
+    func withdrawAppChange() async {
+        await run {
+            try await self.api.cancelAppChange()
+            SharedStore.pendingAppChange = nil
+        }
+    }
+
+    /// Keyholder approves or declines an app change.
+    func decideAppChange(requestID: UUID, approve: Bool) async {
+        await run { _ = try await self.api.decideAppChange(requestID: requestID, approve: approve) }
     }
 
     func startBreakGlass() async {
@@ -307,11 +425,18 @@ final class AppState: ObservableObject {
             if let requestID { await decide(requestID: requestID, decision: .approvedTimed, minutes: 60) }
         case PushRegistrar.Action.deny:
             if let requestID { await decide(requestID: requestID, decision: .denied, minutes: nil) }
+        case PushRegistrar.Action.approveApps:
+            if let requestID { await decideAppChange(requestID: requestID, approve: true) }
+        case PushRegistrar.Action.denyApps:
+            if let requestID { await decideAppChange(requestID: requestID, approve: false) }
         default:
             await refresh()
             // Tapping a request notification opens the decide sheet.
-            if userInfo["category"] as? String == "UNLOCK_REQUEST",
-               let held = snapshot?.held.first(where: { $0.pendingRequest?.id == requestID }) {
+            let category = userInfo["category"] as? String
+            if category == PushRegistrar.unlockRequestCategory || category == PushRegistrar.appChangeRequestCategory,
+               let held = snapshot?.held.first(where: {
+                   $0.pendingRequest?.id == requestID || $0.pendingAppChange?.id == requestID
+               }) {
                 sheet = .decide(held)
             }
         }

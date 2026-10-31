@@ -37,8 +37,12 @@ Decisions already made:
 **Keys**
 - Invite link carries a mode: *hold my key*, *I'll hold yours*, or *mutual*.
 - Lock is disabled until someone holds your key.
-- Tightening (adding apps) is free. Loosening (removing apps, shortening
-  cooling-off, removing your keyholder) requires an approved unlock or an ended block.
+- Tightening (blocking more apps) applies instantly, even while locked.
+  Opening apps up while locked (*Change apps…* in the ··· menu) is sent to the
+  keyholder as a request, like asking for time: they approve or say no, and see
+  only counts ("keep 2 more apps open"), never which apps. One app change can
+  wait at a time; a new one replaces it. Shortening cooling-off or removing your
+  keyholder still needs an ended block.
 - A keyholder may resign only when the person they guard has no active block.
 
 **Streak** (continuous time with a live block)

@@ -160,6 +160,53 @@ final class SupabaseService {
         )).execute().value
     }
 
+    // MARK: Changing apps while locked (migration 0005)
+
+    private struct RequestAppChangeParams: Encodable {
+        let pOpenedApps: Int
+        let pOpenedCategories: Int
+        let pAppCount: Int
+        let pCategoryCount: Int
+        let pAllowedCount: Int
+    }
+
+    /// Ask the keyholder to open apps up. The counts after the change describe the new block size.
+    func requestAppChange(openedApps: Int, openedCategories: Int,
+                          appCount: Int, categoryCount: Int, allowedCount: Int) async throws -> UnlockRequest {
+        try await client.rpc("request_app_change", params: RequestAppChangeParams(
+            pOpenedApps: openedApps, pOpenedCategories: openedCategories,
+            pAppCount: appCount, pCategoryCount: categoryCount, pAllowedCount: allowedCount
+        )).execute().value
+    }
+
+    private struct DecideAppChangeParams: Encodable {
+        let pRequestId: String
+        let pApprove: Bool
+    }
+
+    func decideAppChange(requestID: UUID, approve: Bool) async throws -> UnlockRequest {
+        try await client.rpc("decide_app_change", params: DecideAppChangeParams(
+            pRequestId: requestID.uuidString, pApprove: approve
+        )).execute().value
+    }
+
+    func cancelAppChange() async throws {
+        try await client.rpc("cancel_app_change").execute()
+    }
+
+    private struct UpdateBlockAppsParams: Encodable {
+        let pAppCount: Int
+        let pCategoryCount: Int
+        let pAllowedCount: Int
+    }
+
+    /// Tell the server the block's new size after a change took effect on the phone.
+    func updateBlockApps(appCount: Int, categoryCount: Int, allowedCount: Int) async throws -> Block {
+        try await client.rpc("update_block_apps", params: UpdateBlockAppsParams(
+            pAppCount: appCount, pCategoryCount: categoryCount, pAllowedCount: allowedCount
+        )).execute().value
+    }
+
     // MARK: Device and profile
 
     private struct RegisterDeviceParams: Encodable {

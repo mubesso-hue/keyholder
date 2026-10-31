@@ -21,6 +21,7 @@ enum SharedStore {
         static let lastExtensionEvent = "lastExtensionEvent"
         static let blockMode = "blockMode"
         static let allowedSelection = "allowedSelection"
+        static let pendingAppChange = "pendingAppChange"
     }
 
     // MARK: Blocked apps
@@ -58,6 +59,29 @@ enum SharedStore {
                 defaults.set(data, forKey: Key.allowedSelection)
             } else {
                 defaults.removeObject(forKey: Key.allowedSelection)
+            }
+        }
+    }
+
+    /// The selection that shields the current or next block, for a mode.
+    static func selection(for mode: BlockMode) -> FamilyActivitySelection {
+        switch mode {
+        case .selected: return selection ?? FamilyActivitySelection()
+        case .allExcept: return allowedSelection ?? FamilyActivitySelection(includeEntireCategory: true)
+        }
+    }
+
+    /// An app change sent to the keyholder and not yet answered.
+    static var pendingAppChange: PendingAppChange? {
+        get {
+            guard let data = defaults.data(forKey: Key.pendingAppChange) else { return nil }
+            return try? JSONDecoder().decode(PendingAppChange.self, from: data)
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: Key.pendingAppChange)
+            } else {
+                defaults.removeObject(forKey: Key.pendingAppChange)
             }
         }
     }
@@ -128,5 +152,6 @@ enum SharedStore {
         unlockUntil = nil
         breakGlassEndsAt = nil
         pendingShieldRequestAt = nil
+        pendingAppChange = nil
     }
 }

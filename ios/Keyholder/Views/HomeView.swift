@@ -54,6 +54,9 @@ struct HomeView: View {
                 case .settings: SettingsView()
                 case .accept(let code): AcceptInviteView(initialCode: code ?? "")
                 case .decide(let held): DecideRequestSheet(held: held)
+                case .editApps:
+                    let editor = state.appEditorStart()
+                    EditAppsView(mode: editor.mode, current: editor.current, start: editor.start)
                 }
             }
         }
@@ -175,23 +178,27 @@ struct HeroView: View {
         .glass()
     }
 
-    @ViewBuilder
     private func actions(_ block: Block) -> some View {
-        HStack(spacing: 10) {
-            if let pending = snapshot.myPendingRequest {
-                Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Theme.white60)
-            } else {
-                Button("Ask \(holderName) for time") { state.sheet = .request }
-                    .buttonStyle(GlassPillStyle())
-                    .disabled(state.busy)
-            }
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                if let pending = snapshot.myPendingRequest {
+                    Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Theme.white60)
+                } else {
+                    Button("Ask \(holderName) for time") { state.sheet = .request }
+                        .buttonStyle(GlassPillStyle())
+                        .disabled(state.busy)
+                }
 
-            if block.breakGlassEndsAt == nil {
                 Menu {
-                    Button(role: .destructive) { state.sheet = .breakGlass } label: {
-                        Label("Break Glass…", systemImage: "exclamationmark.triangle")
+                    Button { state.sheet = .editApps } label: {
+                        Label("Change apps…", systemImage: "square.grid.2x2")
+                    }
+                    if block.breakGlassEndsAt == nil {
+                        Button(role: .destructive) { state.sheet = .breakGlass } label: {
+                            Label("Break Glass…", systemImage: "exclamationmark.triangle")
+                        }
                     }
                 } label: {
                     Text("···")
@@ -205,6 +212,15 @@ struct HeroView: View {
                         }
                 }
                 .accessibilityLabel("More")
+            }
+
+            if state.pendingAppChange != nil, let change = snapshot.myAppChange?.change {
+                Text("Waiting for \(holderName) to OK your app change: \(change.request).")
+                    .font(Theme.helper)
+                    .foregroundStyle(Theme.white60)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 12)
+                    .legibleOnPhoto()
             }
         }
     }
@@ -324,6 +340,20 @@ struct HeldKeyRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.white60)
                         .padding(.top, 4)
+
+                    if let change = held.pendingAppChange {
+                        Text("Wants to \(change.change?.request ?? "change their apps")")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.top, 10)
+                        HStack(spacing: 6) {
+                            Button("Approve") { Task { await state.decideAppChange(requestID: change.id, approve: true) } }
+                            Button("No") { Task { await state.decideAppChange(requestID: change.id, approve: false) } }
+                        }
+                        .buttonStyle(GlassPillStyle(compact: true))
+                        .disabled(state.busy)
+                        .padding(.top, 10)
+                    }
 
                     if let request = held.pendingRequest {
                         Text(request.requestedMinutes.map { "Asking for \(UnlockDuration.format(minutes: $0))" } ?? "Asking for time")
