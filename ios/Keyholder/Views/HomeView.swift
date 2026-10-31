@@ -28,9 +28,13 @@ struct HomeView: View {
                                 .padding(.top, 22)
                             }
 
-                            footerLinks
-                                .padding(.top, 28)
-                                .padding(.bottom, 24)
+                            // With no keyholder the hero already shows Invite / Enter a code.
+                            if snapshot.keyholder != nil {
+                                footerLinks
+                                    .padding(.top, 28)
+                            }
+
+                            Spacer().frame(height: 24)
                         } else {
                             ProgressView().tint(.white).padding(.top, 120)
                         }
