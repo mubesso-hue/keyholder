@@ -32,6 +32,11 @@
   .screen { background: var(--ink); border-radius: 40px; height: 100%; overflow: hidden; position: relative; display: flex; flex-direction: column; }
   .bg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .bg .shimmer { animation: shimmer 9s ease-in-out infinite alternate; }
+  .photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .photo-overlay { position: absolute; inset: 0; background:
+      linear-gradient(to bottom, rgba(10,10,10,.75) 0%, rgba(10,10,10,0) 28%),
+      linear-gradient(to top, rgba(10,10,10,.96) 0%, rgba(10,10,10,.7) 24%, rgba(10,10,10,0) 48%),
+      rgba(10,10,10,.22); }
   @keyframes shimmer { from { transform: translateX(-8px); opacity: .55; } to { transform: translateX(8px); opacity: 1; } }
   .ui { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100%; padding: 0 24px; overflow-y: auto; scrollbar-width: none; }
   .ui::-webkit-scrollbar { display: none; }
@@ -373,6 +378,23 @@ function act(fn) { fn(); tick(); render(); }
 const LOCK_ICON = `<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><circle cx="12" cy="15.5" r="1"/></svg>`;
 const GEAR_ICON = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;
 
+// Eight generated nature scenes rotate one per page load (mirrors BackgroundLibrary in the app).
+// Each phone shows a different one. If a photo is missing, the drawn dusk gradient stays.
+const BACKGROUNDS = Array.from({ length: 8 }, (_, i) => `bg-${String(i + 1).padStart(2, '0')}`);
+const BG_INDEX = (() => {
+  let i;
+  try {
+    const last = localStorage.getItem('backgroundIndex');
+    i = last === null ? Math.floor(Math.random() * BACKGROUNDS.length) : (Number(last) + 1) % BACKGROUNDS.length;
+    localStorage.setItem('backgroundIndex', String(i));
+  } catch (_) { i = Math.floor(Math.random() * BACKGROUNDS.length); }
+  return i;
+})();
+function photo(u) {
+  const name = BACKGROUNDS[(BG_INDEX + (u === 'sarah' ? 1 : 0)) % BACKGROUNDS.length];
+  return `<img class="photo" src="bg/${name}.jpg" alt="" onerror="this.nextElementSibling.remove();this.remove()"><div class="photo-overlay"></div>`;
+}
+
 // Dusk over still water: sky gradient, horizon glow, lake, a pool of light, shimmer, legibility overlay.
 function landscape() {
   return `<svg class="bg" viewBox="0 0 375 812" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -535,7 +557,7 @@ function banners(u) {
 function phone(u) {
   const held = heldBy(u), b = activeBlock(u), locked = !!b;
   const cls = ['screen', locked ? 'locked' : '', held.length ? 'holds' : '', (b && b.bgEndsAt) ? 'panelled' : ''].join(' ');
-  return `<div class="${cls}">${landscape()}${banners(u)}
+  return `<div class="${cls}">${landscape()}${photo(u)}${banners(u)}
     <div class="ui">
       <div class="statusbar"><span>${tm(now())}</span><span>${USERS[u].name}'s iPhone</span></div>
       <div class="top"><span class="wordmark">Keyholder</span><span class="gear" title="Settings">${GEAR_ICON}</span></div>

@@ -1,0 +1,48 @@
+# Downloads the generated background images listed in assets/backgrounds.json,
+# resizes them for phones, and commits them into the iOS asset catalog and the
+# preview. Manual trigger. The cloud session that generates the images cannot
+# reach the image host, so the runner does the fetching.
+
+name: Fetch backgrounds
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download and convert
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -q imagemagick jq >/dev/null
+          mkdir -p preview/bg
+          jq -c '.[]' assets/backgrounds.json | while read -r item; do
+            name=$(echo "$item" | jq -r .name)
+            url=$(echo "$item" | jq -r .url)
+            echo "== $name"
+            curl -sSfL --retry 3 -o "/tmp/$name.src" "$url"
+            # Phone-sized JPEG, long edge 2400px, quality 84, metadata stripped.
+            convert "/tmp/$name.src" -auto-orient -resize 1350x2400^ -gravity center -extent 1350x2400 \
+              -strip -interlace Plane -quality 84 "/tmp/$name.jpg"
+            dir="ios/Keyholder/Resources/Backgrounds.xcassets/$name.imageset"
+            mkdir -p "$dir"
+            cp "/tmp/$name.jpg" "$dir/$name.jpg"
+            cp "/tmp/$name.jpg" "preview/bg/$name.jpg"
+            ls -la "$dir/$name.jpg"
+          done
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ios/Keyholder/Resources preview/bg
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "Add generated background images"
+          git push
