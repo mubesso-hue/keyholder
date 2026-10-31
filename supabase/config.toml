@@ -1,0 +1,10 @@
+# Supabase CLI project config (only the parts that matter for this app).
+# Run `supabase init` once if you want the full generated file, then keep these sections.
+
+[functions.device-event]
+# Extensions authenticate with the per-device secret, not a user JWT.
+verify_jwt = false
+
+[functions.send-push]
+# Called by a Database Webhook; authenticated with the x-webhook-secret header.
+verify_jwt = false

@@ -1,0 +1,13 @@
+# Xcode / SPM
+ios/Keyholder.xcodeproj/
+ios/*.xcworkspace/
+ios/DerivedData/
+ios/.build/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
+# Archives
+*.tar.gz

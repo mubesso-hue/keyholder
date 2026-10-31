@@ -1,0 +1,10 @@
+// Fill these in before running `xcodegen generate`.
+//
+// NOTE: `//` starts a comment in xcconfig, so URLs need the $() trick below.
+
+DEVELOPMENT_TEAM = ABCDE12345
+APP_BUNDLE_ID = com.keyholder.app
+APP_GROUP_ID = group.com.keyholder.app
+
+SUPABASE_URL = https:$()//YOUR-PROJECT-REF.supabase.co
+SUPABASE_ANON_KEY = YOUR-ANON-KEY
