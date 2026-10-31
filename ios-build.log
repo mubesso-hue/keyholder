@@ -1,43 +1,9 @@
-run: 41223047989  sha: f0dc22ca06466d10eb04c2c475de2958e7783281  2026-10-31T17:10:31Z
+run: 41223689111  sha: c0ee4044ba7a822a7e623d7c96c4cd123da78ac7  2026-10-31T17:18:24Z
 result: ** BUILD SUCCEEDED **
 
 === unique errors ===
 
 === last 200 lines of build.log ===
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/KeyholderApp.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LandscapeBackground.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LockButton.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 Compiling\ LockFlowView.swift,\ Models.swift,\ PermissionView.swift,\ RequestSheets.swift,\ RootView.swift,\ ScreenTimeController.swift,\ SettingsView.swift,\ SharedConfig.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LockFlowView.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Models.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/PermissionView.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/RequestSheets.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/RootView.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/ScreenTimeController.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/SettingsView.swift /Users/runner/work/keyholder/keyholder/ios/Shared/SharedConfig.swift (in target 'Keyholder' from project 'Keyholder')
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LockFlowView.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Models.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/PermissionView.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/RequestSheets.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
-SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/RootView.swift (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    
-
 SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/ScreenTimeController.swift (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
     
@@ -50,6 +16,39 @@ SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Shared/Shar
     cd /Users/runner/work/keyholder/keyholder/ios
     
 
+SwiftCompile normal arm64 Compiling\ AppState.swift,\ BreakGlassView.swift,\ DeviceAPI.swift,\ HomeView.swift,\ InviteViews.swift,\ KeyholderApp.swift,\ LandscapeBackground.swift,\ LockButton.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/AppState.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/BreakGlassView.swift /Users/runner/work/keyholder/keyholder/ios/Shared/DeviceAPI.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/HomeView.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/InviteViews.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/KeyholderApp.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LandscapeBackground.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LockButton.swift (in target 'Keyholder' from project 'Keyholder')
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/AppState.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/BreakGlassView.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Shared/DeviceAPI.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/HomeView.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/InviteViews.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/KeyholderApp.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LandscapeBackground.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
+SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/LockButton.swift (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    
+
 SwiftDriverJobDiscovery normal arm64 Emitting module for Keyholder (in target 'Keyholder' from project 'Keyholder')
 
 SwiftDriver\ Compilation\ Requirements Keyholder normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Keyholder' from project 'Keyholder')
@@ -59,9 +58,9 @@ SwiftDriver\ Compilation\ Requirements Keyholder normal arm64 com.apple.xcode.to
 LinkAssetCatalog /Users/runner/work/keyholder/keyholder/ios/Keyholder/Resources/Backgrounds.xcassets (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
     builtin-linkAssetCatalog --thinned /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_output/thinned --thinned-dependencies /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_dependencies_thinned --thinned-info-plist-content /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_generated_info.plist_thinned --unthinned /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_output/unthinned --unthinned-dependencies /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_dependencies_unthinned --unthinned-info-plist-content /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_generated_info.plist_unthinned --output /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app --plist-output /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_generated_info.plist
+note: Emplaced /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/AppIcon60x60@2x.png (in target 'Keyholder' from project 'Keyholder')
 note: Emplaced /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Assets.car (in target 'Keyholder' from project 'Keyholder')
 note: Emplaced /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/AppIcon76x76@2x~ipad.png (in target 'Keyholder' from project 'Keyholder')
-note: Emplaced /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/AppIcon60x60@2x.png (in target 'Keyholder' from project 'Keyholder')
 
 SwiftMergeGeneratedHeaders /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/DerivedSources/Keyholder-Swift.h /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder-Swift.h (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
@@ -84,6 +83,7 @@ Copy /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder.swiftsourceinfo /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.swiftmodule/Project/arm64-apple-ios.swiftsourceinfo
 
 SwiftCompile normal arm64 Compiling\ SharedStore.swift,\ ShieldController.swift,\ SignInView.swift,\ Streak.swift,\ SupabaseService.swift,\ Theme.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/keyholder/keyholder/ios/Shared/SharedStore.swift /Users/runner/work/keyholder/keyholder/ios/Shared/ShieldController.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/SignInView.swift /Users/runner/work/keyholder/keyholder/ios/Shared/Streak.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/SupabaseService.swift /Users/runner/work/keyholder/keyholder/ios/Keyholder/Views/Theme.swift /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'Keyholder' from project 'Keyholder')
+
 SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/Shared/SharedStore.swift (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
     
@@ -123,9 +123,9 @@ SwiftCompile normal arm64 /Users/runner/work/keyholder/keyholder/ios/DerivedData
 
 SwiftDriverJobDiscovery normal arm64 Compiling LockFlowView.swift, Models.swift, PermissionView.swift, RequestSheets.swift, RootView.swift, ScreenTimeController.swift, SettingsView.swift, SharedConfig.swift (in target 'Keyholder' from project 'Keyholder')
 
-SwiftDriverJobDiscovery normal arm64 Compiling AppState.swift, BreakGlassView.swift, DeviceAPI.swift, HomeView.swift, InviteViews.swift, KeyholderApp.swift, LandscapeBackground.swift, LockButton.swift (in target 'Keyholder' from project 'Keyholder')
-
 SwiftDriverJobDiscovery normal arm64 Compiling SharedStore.swift, ShieldController.swift, SignInView.swift, Streak.swift, SupabaseService.swift, Theme.swift, GeneratedAssetSymbols.swift (in target 'Keyholder' from project 'Keyholder')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppState.swift, BreakGlassView.swift, DeviceAPI.swift, HomeView.swift, InviteViews.swift, KeyholderApp.swift, LandscapeBackground.swift, LockButton.swift (in target 'Keyholder' from project 'Keyholder')
 
 SwiftDriver\ Compilation Keyholder normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
@@ -144,13 +144,13 @@ Ld /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-i
     cd /Users/runner/work/keyholder/keyholder/ios
     /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios17.0 -isysroot /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -O0 -L/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -F/Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/PackageFrameworks -Xlinker -rpath -Xlinker @executable_path/Frameworks -rdynamic -Xlinker -no_deduplicate -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder-ExecutorLinkFileList-normal-arm64.txt /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder.debug.dylib -o /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder
 
-Copy /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShieldAction.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShieldAction.appex (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShieldAction.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns
-
 Copy /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShield.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShield.appex (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
     builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShield.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns
+
+Copy /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShieldAction.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShieldAction.appex (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -exclude Headers -exclude PrivateHeaders -exclude Modules -exclude \*.tbd -resolve-src-symlinks -remove-static-executable /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderShieldAction.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns
 
 Copy /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderMonitor.appex /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/KeyholderMonitor.appex (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
@@ -160,16 +160,16 @@ ProcessInfoPlistFile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Buil
     cd /Users/runner/work/keyholder/keyholder/ios
     builtin-infoPlistUtility /Users/runner/work/keyholder/keyholder/ios/Keyholder/Info.plist -producttype com.apple.product-type.application -genpkginfo /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PkgInfo -expandbuildsettings -format binary -platform iphoneos -additionalcontentfile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/assetcatalog_generated_info.plist -scanforprivacyfile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderMonitor.appex -scanforprivacyfile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShield.appex -scanforprivacyfile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShieldAction.appex -scanforprivacyfile /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/swift-crypto_Crypto.bundle -requiredArchitecture arm64 -o /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Info.plist
 
-ExtractAppIntentsMetadata (in target 'Keyholder' from project 'Keyholder')
-    cd /Users/runner/work/keyholder/keyholder/ios
-    /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.Ft3wGX/Metal.xctoolchain --module-name Keyholder --sdk-root /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk --xcode-version 17C529 --platform-family iOS --deployment-target 17.0 --bundle-identifier com.keyholder.app --output /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app --target-triple arm64-apple-ios17.0 --binary-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder --dependency-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder_dependency_info.dat --stringsdata-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder.SwiftFileList --metadata-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
-2026-10-31 17:10:28.901 appintentsmetadataprocessor[4615:17435] Starting appintentsmetadataprocessor export
-2026-10-31 17:10:28.904 appintentsmetadataprocessor[4615:17435] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
-
 CopySwiftLibs /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
-    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder.debug.dylib --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Frameworks --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/SystemExtensions --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Extensions --platform iphoneos --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.Ft3wGX/Metal.xctoolchain --toolchain /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+    builtin-swiftStdLibTool --copy --verbose --scan-executable /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder.debug.dylib --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Frameworks --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/SystemExtensions --scan-folder /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Extensions --platform iphoneos --toolchain /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.7fvC4R/Metal.xctoolchain --toolchain /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
 Ignoring --strip-bitcode because --sign was not passed
+
+ExtractAppIntentsMetadata (in target 'Keyholder' from project 'Keyholder')
+    cd /Users/runner/work/keyholder/keyholder/ios
+    /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /var/run/com.apple.security.cryptexd/mnt/com.apple.MobileAsset.MetalToolchain-v17.3.7003.10.7fvC4R/Metal.xctoolchain --module-name Keyholder --sdk-root /Applications/Xcode_26.3.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk --xcode-version 17C529 --platform-family iOS --deployment-target 17.0 --bundle-identifier com.keyholder.app --output /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app --target-triple arm64-apple-ios17.0 --binary-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Keyholder --dependency-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder_dependency_info.dat --stringsdata-file /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder.SwiftFileList --metadata-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder.DependencyMetadataFileList --static-metadata-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder.DependencyStaticMetadataFileList --swift-const-vals-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Objects-normal/arm64/Keyholder.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-10-31 17:18:22.094 appintentsmetadataprocessor[10870:36087] Starting appintentsmetadataprocessor export
+2026-10-31 17:18:22.098 appintentsmetadataprocessor[10870:36087] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
 
 ValidateEmbeddedBinary /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/PlugIns/KeyholderShieldAction.appex (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
@@ -186,8 +186,8 @@ ValidateEmbeddedBinary /Users/runner/work/keyholder/keyholder/ios/DerivedData/Bu
 AppIntentsSSUTraining (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
     /Applications/Xcode_26.3.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsnltrainingprocessor --infoplist-path /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Info.plist --temp-dir-path /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/ssu --bundle-id com.keyholder.app --product-path /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app --extracted-metadata-path /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app/Metadata.appintents --metadata-file-list /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Intermediates.noindex/Keyholder.build/Debug-iphoneos/Keyholder.build/Keyholder.DependencyMetadataFileList --archive-ssu-assets
-2026-10-31 17:10:30.970 appintentsnltrainingprocessor[4632:17519] Parsing options for appintentsnltrainingprocessor
-2026-10-31 17:10:30.971 appintentsnltrainingprocessor[4632:17519] No AppShortcuts found - Skipping.
+2026-10-31 17:18:23.728 appintentsnltrainingprocessor[10882:36152] Parsing options for appintentsnltrainingprocessor
+2026-10-31 17:18:23.729 appintentsnltrainingprocessor[10882:36152] No AppShortcuts found - Skipping.
 
 RegisterExecutionPolicyException /Users/runner/work/keyholder/keyholder/ios/DerivedData/Build/Products/Debug-iphoneos/Keyholder.app (in target 'Keyholder' from project 'Keyholder')
     cd /Users/runner/work/keyholder/keyholder/ios
