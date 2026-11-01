@@ -249,6 +249,14 @@ select public.device_event(:'dev_secret', 'heartbeat', '{"authorized": true, "sh
 select pg_temp.ok((select verified from public.blocks where id = :'sarah_block2'), 'device heartbeat re-verifies');
 select pg_temp.assert_raises($$select public.device_event('nope', 'heartbeat', '{}')$$, 'unknown device');
 
+-- The midnight heartbeat from the extension can wrongly say "not authorized".
+-- It must not end the block or mark it unverified.
+update public.blocks set started_at = now() - interval '6 hours' where id = :'sarah_block2';
+select public.device_event(:'dev_secret', 'heartbeat', '{"authorized": false, "shielded": true}');
+select pg_temp.ok((select status = 'active' and verified from public.blocks where id = :'sarah_block2'), 'extension heartbeat saying not authorized is ignored');
+select pg_temp.ok((select count(*) from public.events where block_id = :'sarah_block2' and type = 'extension_heartbeat') = 2, 'extension heartbeats are logged');
+update public.blocks set started_at = now() where id = :'sarah_block2';
+
 select public.device_event(:'dev_secret', 'request_unlock', '{"minutes": 15}');
 select pg_temp.ok((select count(*) from public.unlock_requests where block_id = :'sarah_block2' and status = 'pending') = 1, 'shield button creates a request');
 

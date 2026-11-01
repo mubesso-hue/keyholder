@@ -41,10 +41,12 @@ final class MonitorExtension: DeviceActivityMonitor {
         }
     }
 
+    /// A liveness ping. It deliberately says nothing about Screen Time access:
+    /// in the background the extension can read "not authorized" while access
+    /// is fine, which once ended a block at midnight. Only the app, after
+    /// repeated checks, reports a revocation.
     private func postHeartbeat() {
-        let authorized = AuthorizationCenter.shared.authorizationStatus == .approved
         DeviceAPI.post(.heartbeat, payload: [
-            "authorized": authorized,
             "shielded": ShieldController.isShielding,
         ])
     }
