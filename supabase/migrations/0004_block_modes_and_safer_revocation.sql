@@ -7,16 +7,17 @@ alter table public.blocks
     check (mode in ('selected', 'all_except')),
   add column if not exists allowed_count int not null default 0;
 
--- start_block gains two optional arguments. Older app builds call it with the
--- first three named arguments only, and keep working through the defaults.
-drop function if exists public.start_block(int, int, int);
-
+-- start_block gets a five-argument form for the lock modes. The original
+-- three-argument form stays for app builds that send only those three, and
+-- now calls the new one. The new form has no defaults, so a call naming three
+-- arguments can only mean the original. (Keeping both avoids dropping a
+-- function, which Supabase holds for a confirmation prompt.)
 create or replace function public.start_block(
   p_cooling_off_hours int,
   p_app_count int,
   p_category_count int,
-  p_mode text default 'selected',
-  p_allowed_count int default 0
+  p_mode text,
+  p_allowed_count int
 )
 returns public.blocks language plpgsql security definer set search_path = public as $$
 declare me uuid := public._require_user(); k public.keys; b public.blocks; v_summary text;
@@ -58,8 +59,14 @@ begin
   return b;
 end $$;
 
-revoke execute on function public.start_block(int, int, int, text, int) from public, anon;
+create or replace function public.start_block(p_cooling_off_hours int, p_app_count int, p_category_count int)
+returns public.blocks language plpgsql security definer set search_path = public as $$
+begin
+  return public.start_block(p_cooling_off_hours, p_app_count, p_category_count, 'selected', 0);
+end $$;
+
 grant execute on function public.start_block(int, int, int, text, int) to authenticated;
+-- Revoking anon access lives in 0007, applied separately.
 
 -- 2. Safer revocation.
 --    Screen Time can briefly report "not authorized" right after access is
