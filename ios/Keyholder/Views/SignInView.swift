@@ -40,7 +40,7 @@ struct SignInView: View {
                     Task { await state.signIn(idToken: token, nonce: nonce, fullName: name.isEmpty ? nil : name) }
                 case .failure(let error):
                     if (error as? ASAuthorizationError)?.code != .canceled {
-                        state.errorMessage = error.localizedDescription
+                        state.errorMessage = Self.message(for: error)
                     }
                 }
             }
@@ -53,6 +53,20 @@ struct SignInView: View {
                 .multilineTextAlignment(.center)
         }
         .padding(24)
+    }
+
+    /// Apple's own errors read "AuthorizationError error 1000". Say what to do instead.
+    static func message(for error: Error) -> String {
+        switch (error as? ASAuthorizationError)?.code {
+        case .unknown?:
+            // Most often: the iPhone isn't signed in to an Apple Account, or the
+            // account doesn't have two-factor authentication turned on.
+            return "Sign in with Apple isn't available on this iPhone right now. Open Settings and check that you're signed in to your Apple Account at the top, with two-factor authentication on, then try again."
+        case .failed?, .invalidResponse?, .notHandled?:
+            return "Apple couldn't finish signing you in. Check your connection and try again."
+        default:
+            return error.localizedDescription
+        }
     }
 }
 
