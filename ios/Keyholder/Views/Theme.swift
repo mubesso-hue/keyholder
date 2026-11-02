@@ -97,6 +97,60 @@ struct GlassPillStyle: ButtonStyle {
     }
 }
 
+/// The main answer on a card: orange, with dark type for contrast.
+struct OrangePillStyle: ButtonStyle {
+    var fullWidth = true
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(Theme.ink)
+            .frame(maxWidth: fullWidth ? .infinity : nil)
+            .padding(.vertical, 15)
+            .padding(.horizontal, 22)
+            .background(Capsule().fill(Theme.orangeGradient))
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// A quiet destructive action, such as ending someone's block.
+struct DangerOutlinePillStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Color(hex: 0xFF9A9C))
+            .padding(.vertical, 14)
+            .padding(.horizontal, 28)
+            .background {
+                Capsule().fill(Theme.breakRed.opacity(0.14))
+                    .overlay(Capsule().stroke(Theme.breakRed.opacity(0.55), lineWidth: 1))
+            }
+            .opacity(configuration.isPressed ? 0.7 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+/// Something waiting for your answer: glass tinted orange.
+struct AttentionCard: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.orangeMid.opacity(0.16)))
+                    .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Theme.orangeLight.opacity(0.45), lineWidth: 1))
+            }
+    }
+}
+
+extension View {
+    func attentionCard() -> some View { modifier(AttentionCard()) }
+}
+
 /// Break Glass: a solid red pill, so the way out is always in plain sight.
 struct BreakGlassPillStyle: ButtonStyle {
     var fullWidth = false

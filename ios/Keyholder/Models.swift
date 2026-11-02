@@ -180,6 +180,26 @@ struct Snapshot: Codable, Equatable {
     let held: [HeldKey]
 }
 
+/// A week under one key, for the key detail page. From `key_history()`.
+struct KeyHistory: Decodable, Equatable {
+    let requests: Int
+    let given: Int
+    let unlockedMinutes: Int
+    let requestsList: [UnlockRequest]
+    let blocks: [HistoryBlock]
+    let lastBlock: HistoryBlock?
+}
+
+struct HistoryBlock: Decodable, Equatable {
+    let startedAt: Date
+    let endedAt: Date?
+    let endedReason: BlockEndReason?
+    let mode: String?
+    let allowedCount: Int?
+    let appCount: Int?
+    let categoryCount: Int?
+}
+
 struct Device: Codable {
     let id: UUID
     let deviceSecret: String

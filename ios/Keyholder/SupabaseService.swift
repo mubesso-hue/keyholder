@@ -223,6 +223,10 @@ final class SupabaseService {
         try await client.rpc("set_block_allowance", params: ["p_minutes": minutes]).execute().value
     }
 
+    func keyHistory(lockedID: UUID) async throws -> KeyHistory {
+        try await client.rpc("key_history", params: ["p_locked_id": lockedID.uuidString]).execute().value
+    }
+
     // MARK: Device and profile
 
     private struct RegisterDeviceParams: Encodable {

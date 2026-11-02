@@ -37,6 +37,8 @@ final class AppState: ObservableObject {
     /// The last refresh couldn't reach the server. Shown as a quiet label, not an alert.
     @Published private(set) var isOffline = false
     @Published var sheet: Sheet?
+    /// A key to open on the home screen, e.g. after tapping a request notification.
+    @Published var openKey: UUID?
     @Published var busy = false
 
     /// serverTime - localTime at last snapshot. Streak display uses server time.
@@ -345,6 +347,10 @@ final class AppState: ObservableObject {
         await run { _ = try await self.api.setBlockAllowance(minutes: 0) }
     }
 
+    func keyHistory(for held: HeldKey) async -> KeyHistory? {
+        try? await api.keyHistory(lockedID: held.profile.id)
+    }
+
     /// Your private name for someone you're tied to. Empty goes back to their own name.
     func rename(_ profile: Profile, to name: String) async {
         await run { try await self.api.setNickname(target: profile.id, name: name) }
@@ -528,7 +534,7 @@ final class AppState: ObservableObject {
                let held = snapshot?.held.first(where: {
                    $0.pendingRequest?.id == requestID || $0.pendingAppChange?.id == requestID
                }) {
-                sheet = .decide(held)
+                openKey = held.id
             }
         }
     }

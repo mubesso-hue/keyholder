@@ -172,7 +172,15 @@ struct CustomDurationPicker: View {
     var disabled = false
     let action: (Int) -> Void
 
-    @State private var expanded = false
+    @State private var expanded: Bool
+
+    init(actionTitle: @escaping (Int) -> String, disabled: Bool = false, startExpanded: Bool = false,
+         action: @escaping (Int) -> Void) {
+        self.actionTitle = actionTitle
+        self.disabled = disabled
+        self.action = action
+        _expanded = State(initialValue: startExpanded)
+    }
     @State private var hours = 0
     @State private var minutes = 45
 

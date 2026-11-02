@@ -4,9 +4,11 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var state: AppState
     @State private var renameTarget: Profile?
+    /// Keys opened from the home screen, by key id.
+    @State private var path: [UUID] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 LandscapeBackground()
 
@@ -23,7 +25,9 @@ struct HomeView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     TrackedLabel(text: "KEYS YOU HOLD")
                                     ForEach(snapshot.held) { held in
-                                        HeldKeyRow(held: held) { renameTarget = held.profile }
+                                        HeldKeyRow(held: held,
+                                                   onRename: { renameTarget = held.profile },
+                                                   onOpen: { path = [held.id] })
                                     }
                                 }
                                 .padding(.top, 22)
@@ -44,9 +48,13 @@ struct HomeView: View {
                 }
                 .scrollIndicators(.hidden)
             }
+            .navigationTitle("Keys")
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await state.refresh() }
             .renameAlert($renameTarget)
+            .navigationDestination(for: UUID.self) { keyID in
+                KeyDetailView(keyID: keyID)
+            }
             .sheet(item: $state.sheet) { sheet in
                 switch sheet {
                 case .lock: LockFlowView()
@@ -63,6 +71,12 @@ struct HomeView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onChange(of: state.openKey) { _, keyID in
+            guard let keyID else { return }
+            state.sheet = nil
+            path = [keyID]
+            state.openKey = nil
+        }
     }
 
     private var header: some View {
@@ -350,6 +364,8 @@ struct HeldKeyRow: View {
     @EnvironmentObject private var state: AppState
     let held: HeldKey
     var onRename: () -> Void = {}
+    /// Opens the key detail page. Buttons on the card keep their own actions.
+    var onOpen: () -> Void = {}
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -361,6 +377,11 @@ struct HeldKeyRow: View {
                         .foregroundStyle(.white)
                     Spacer()
                     status(now: now)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.white40)
+                        .padding(.leading, 4)
+                        .accessibilityHidden(true)
                 }
 
                 if let block = held.block, block.isActive {
@@ -425,7 +446,11 @@ struct HeldKeyRow: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glass()
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .onTapGesture { onOpen() }
+            .accessibilityAction(named: "Open details") { onOpen() }
             .contextMenu {
+                Button { onOpen() } label: { Label("Open", systemImage: "chevron.right") }
                 Button { onRename() } label: { Label("Rename…", systemImage: "pencil") }
             }
         }

@@ -387,6 +387,16 @@ select pg_temp.assert_raises($$select public.decide_app_change('$$ || :'change3'
 select pg_temp.assert_raises('select public.request_app_change(1, 0, 0, 0, 1)', 'not locked');
 select pg_temp.assert_raises('select public.update_block_apps(0, 0, 1)', 'not locked');
 
+-- Key history for the detail page --------------------------------------------------
+select public.key_history(:'tom') as tom_hist \gset
+select pg_temp.ok(((:'tom_hist'::jsonb) ->> 'requests')::int = 1, 'history: one request for time from tom');
+select pg_temp.ok(((:'tom_hist'::jsonb) ->> 'given')::int = 1 and ((:'tom_hist'::jsonb) ->> 'unlocked_minutes')::int = 60, 'history: one hour given');
+select pg_temp.ok(jsonb_array_length((:'tom_hist'::jsonb) -> 'requests_list') = 4, 'history: time and app requests listed');
+select pg_temp.ok(jsonb_array_length((:'tom_hist'::jsonb) -> 'blocks') = 1, 'history: the current block');
+select pg_temp.as_user(:'sarah');
+select pg_temp.assert_raises($$select public.key_history('$$ || :'tom' || $$')$$, 'do not hold');
+select pg_temp.as_user(:'marc');
+
 -- Unauthenticated callers are rejected.
 select pg_temp.as_nobody();
 select pg_temp.assert_raises('select public.me_snapshot()', 'not authenticated');
