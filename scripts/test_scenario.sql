@@ -290,6 +290,40 @@ select pg_temp.ok((select body like '%Everything is blocked except 5 apps.%' fro
 select pg_temp.assert_raises('select public.start_block(24, 0, 0)', 'already locked');
 select id as tom_block from public.blocks where user_id = :'tom' and status = 'active' \gset
 
+-- Nicknames ------------------------------------------------------------------------
+select pg_temp.as_user(:'marc');
+select public.set_nickname(:'tom', '  Tommy  ');
+select public.me_snapshot() as marc_nick_snap \gset
+select pg_temp.ok((select h -> 'profile' ->> 'display_name' = 'Tommy' and h -> 'profile' ->> 'real_name' = 'Someone'
+                     from jsonb_array_elements((:'marc_nick_snap'::jsonb) -> 'held') h
+                    where h -> 'profile' ->> 'id' = :'tom'), 'holder sees their nickname, real name kept');
+select pg_temp.assert_raises($$select public.set_nickname('99999999-9999-9999-9999-999999999999', 'x')$$, 'not connected');
+select pg_temp.assert_raises($$select public.set_nickname('$$ || :'marc' || $$', 'me')$$, 'own name');
+select public._notify(:'marc', 'Someone is asking for time', 'Someone wants 15 min.', 'TEST');
+select pg_temp.ok((select title = 'Tommy is asking for time' and body = 'Tommy wants 15 min.'
+                     from public.notifications where category = 'TEST' order by id desc limit 1), 'pushes use the nickname');
+select pg_temp.as_user(:'tom');
+select pg_temp.ok((public.me_snapshot() -> 'keyholder' -> 'profile' ->> 'display_name') = 'Marc', 'nicknames are per person');
+select pg_temp.as_user(:'marc');
+select public.set_nickname(:'tom', '');
+select pg_temp.ok((select h -> 'profile' ->> 'display_name' = 'Someone'
+                     from jsonb_array_elements(public.me_snapshot() -> 'held') h
+                    where h -> 'profile' ->> 'id' = :'tom'), 'clearing a nickname shows the real name');
+select public.set_nickname(:'tom', 'Tommy');
+
+-- Daily allowance -------------------------------------------------------------------
+select pg_temp.as_user(:'tom');
+select allowance_minutes as tom_allow from public.set_block_allowance(30) \gset
+select pg_temp.ok(:tom_allow = 30, 'allowance chosen at lock');
+select pg_temp.ok(((public.me_snapshot() -> 'block' ->> 'allowance_minutes')::int) = 30, 'snapshot shows the allowance');
+update public.blocks set started_at = now() - interval '10 minutes' where id = :'tom_block';
+select pg_temp.assert_raises('select public.set_block_allowance(60)', 'only your keyholder');
+select allowance_minutes as tom_allow2 from public.set_block_allowance(15) \gset
+select pg_temp.ok(:tom_allow2 = 15, 'allowance can go down any time');
+select pg_temp.assert_raises('select public.set_block_allowance(500)', 'between 0 and 240');
+select allowance_minutes as tom_allow3 from public.set_block_allowance(0) \gset
+select pg_temp.ok(:tom_allow3 = 0, 'allowance can be turned off');
+
 -- Changing apps while locked -----------------------------------------------------
 -- Stricter changes are reported straight away.
 select allowed_count as tom_allowed2 from public.update_block_apps(0, 0, 4) \gset
@@ -364,6 +398,7 @@ select pg_temp.as_user(:'tom');
 select pg_temp.ok((select count(*) from public.blocks where user_id = :'marc') = 0, 'rls: stranger cannot read marc');
 select pg_temp.ok((select count(*) from public.blocks where user_id = :'sarah') = 2, 'rls: former holder still sees sarah history');
 select pg_temp.ok((select count(*) from public.profiles) = 3, 'rls: self plus related only (sarah, marc)');
+select pg_temp.ok((select count(*) from public.nicknames) = 0, 'rls: nicknames are private to who set them');
 select pg_temp.assert_raises('select public.cron_tick()', 'permission denied');
 select pg_temp.assert_raises($$select public.device_event('x', 'heartbeat', '{}')$$, 'permission denied');
 select pg_temp.assert_raises('select public.notify_send_push()', 'permission denied');

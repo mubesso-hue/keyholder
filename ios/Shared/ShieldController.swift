@@ -12,8 +12,24 @@ extension DeviceActivityName {
     static let unlockWindow = Self("unlockWindow")
     /// Ends when the Break Glass cooling-off completes: everything is lifted.
     static let breakGlass = Self("breakGlass")
+    /// Daily, midnight to midnight: counts the minutes used on allowance apps.
+    static let allowance = Self("allowance")
     /// Daily schedule whose callbacks give the extension a chance to send a heartbeat.
     static let heartbeat = Self("heartbeat")
+}
+
+extension DeviceActivityEvent.Name {
+    /// Today's allowance is used up.
+    static let allowanceDone = Self("allowance.done")
+    /// Progress marks every 5 minutes, so the app can show roughly what's left.
+    static func allowanceUsed(_ minutes: Int) -> Self { Self("allowance.used.\(minutes)") }
+
+    /// 15 for "allowance.used.15".
+    var allowanceUsedMinutes: Int? {
+        let prefix = "allowance.used."
+        guard rawValue.hasPrefix(prefix) else { return nil }
+        return Int(rawValue.dropFirst(prefix.count))
+    }
 }
 
 /// How a block decides what to shield.
@@ -48,16 +64,35 @@ enum ShieldController {
     }
 
     /// Re-applies whatever the user chose at Lock time, from the App Group.
-    /// Used by the app and by the monitor extension when an unlock window ends.
+    /// Used by the app and by the monitor extension when an unlock window ends
+    /// or the daily allowance runs out or starts again.
+    ///
+    /// While today's allowance lasts, its apps stay open; the monitor extension
+    /// shields them once Screen Time counts the minutes.
     @discardableResult
     static func applyStoredShields() -> Bool {
+        let allowance = SharedStore.allowanceAvailableToday ? SharedStore.allowanceSelection : nil
         switch SharedStore.blockMode {
         case .allExcept:
-            applyShields(allowing: SharedStore.allowedSelection ?? FamilyActivitySelection())
+            var open = (SharedStore.allowedSelection ?? FamilyActivitySelection()).applicationTokens
+            if let allowance { open.formUnion(allowance.applicationTokens) }
+            store.shield.applications = nil
+            store.shield.applicationCategories = .all(except: open)
+            store.application.denyAppRemoval = true
             return true
         case .selected:
             guard let selection = SharedStore.selection else { return false }
-            applyShields(selection)
+            guard let allowance else {
+                applyShields(selection)
+                return true
+            }
+            let apps = selection.applicationTokens.subtracting(allowance.applicationTokens)
+            let categories = selection.categoryTokens.subtracting(allowance.categoryTokens)
+            store.shield.applications = apps.isEmpty ? nil : apps
+            store.shield.applicationCategories = categories.isEmpty
+                ? nil
+                : .specific(categories, except: allowance.applicationTokens)
+            store.application.denyAppRemoval = true
             return true
         }
     }
@@ -102,6 +137,41 @@ enum MonitorScheduler {
 
     static func cancel(_ names: DeviceActivityName...) {
         DeviceActivityCenter().stopMonitoring(names)
+    }
+
+    /// Counts minutes on the allowance apps, every day from midnight. Restarting
+    /// resets today's count, so callers only start it when it isn't running.
+    static func startAllowance(minutes: Int, selection: FamilyActivitySelection) throws {
+        let center = DeviceActivityCenter()
+        center.stopMonitoring([.allowance])
+        guard minutes > 0, !AppChangePlan.isEmpty(selection) else { return }
+
+        func event(after m: Int) -> DeviceActivityEvent {
+            DeviceActivityEvent(applications: selection.applicationTokens,
+                                categories: selection.categoryTokens,
+                                webDomains: selection.webDomainTokens,
+                                threshold: DateComponents(minute: m))
+        }
+        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [.allowanceDone: event(after: minutes)]
+        for m in stride(from: 5, to: minutes, by: 5) {
+            events[.allowanceUsed(m)] = event(after: m)
+        }
+        let schedule = DeviceActivitySchedule(
+            intervalStart: DateComponents(hour: 0, minute: 0),
+            intervalEnd: DateComponents(hour: 23, minute: 59),
+            repeats: true
+        )
+        try center.startMonitoring(.allowance, during: schedule, events: events)
+    }
+
+    /// Starts allowance counting if the block has one and it isn't running yet.
+    static func ensureAllowance() {
+        guard SharedStore.allowanceMinutes > 0, let selection = SharedStore.allowanceSelection else {
+            cancel(.allowance)
+            return
+        }
+        guard !DeviceActivityCenter().activities.contains(.allowance) else { return }
+        try? startAllowance(minutes: SharedStore.allowanceMinutes, selection: selection)
     }
 
     static func cancelAll() {

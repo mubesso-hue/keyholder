@@ -4,7 +4,12 @@ import Foundation
 
 struct Profile: Codable, Identifiable, Equatable {
     let id: UUID
+    /// Your nickname for this person if you set one, otherwise their own name.
     var displayName: String
+    /// Their own name, when it differs from what you see (snapshot profiles only).
+    var realName: String?
+
+    var hasNickname: Bool { realName != nil && realName != displayName }
 }
 
 enum KeyStatus: String, Codable { case active, ended }
@@ -47,18 +52,26 @@ struct Block: Codable, Identifiable, Equatable {
     /// "selected" or "all_except". Optional so rows from before the column existed decode.
     let mode: String?
     let allowedCount: Int?
+    /// Minutes a day on chosen apps before they block. Optional for older rows.
+    let allowanceMinutes: Int?
 
     var isActive: Bool { status == .active }
 
     var isAllExcept: Bool { mode == BlockMode.allExcept.rawValue }
 
-    /// "Everything except 6 apps" or "5 apps, 1 category".
+    /// "Everything except 6 apps · 30 min a day allowed" or "5 apps, 1 category".
     var summary: String {
+        var text: String
         if isAllExcept {
             let n = allowedCount ?? 0
-            return "Everything except \(n) \(n == 1 ? "app" : "apps")"
+            text = "Everything except \(n) \(n == 1 ? "app" : "apps")"
+        } else {
+            text = "\(appCount) \(appCount == 1 ? "app" : "apps"), \(categoryCount) \(categoryCount == 1 ? "category" : "categories")"
         }
-        return "\(appCount) \(appCount == 1 ? "app" : "apps"), \(categoryCount) \(categoryCount == 1 ? "category" : "categories")"
+        if let m = allowanceMinutes, m > 0 {
+            text += " · \(UnlockDuration.format(minutes: m)) a day allowed"
+        }
+        return text
     }
 
     func isTemporarilyUnlocked(at now: Date = Date()) -> Bool {

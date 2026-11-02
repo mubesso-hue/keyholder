@@ -61,9 +61,9 @@ struct EditAppsView: View {
     private var headerText: String {
         switch mode {
         case .allExcept:
-            return "Removing an app from this list blocks it right away. Keeping more apps open needs \(holder)'s OK."
+            return "Removing an app from this list blocks it right away. Keeping more apps open needs \(holder)'s OK. If a category looks empty, search for the app by name."
         case .selected:
-            return "Blocking more apps works right away. Unblocking an app needs \(holder)'s OK."
+            return "Blocking more apps works right away. Unblocking an app needs \(holder)'s OK. If a category looks empty, search for the app by name."
         }
     }
 

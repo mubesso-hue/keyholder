@@ -8,6 +8,7 @@ struct SettingsView: View {
     @State private var name = ""
     @State private var coolingOff = 24
     @State private var confirmSignOut = false
+    @State private var renameTarget: Profile?
 
     private var block: Block? { state.snapshot?.block }
     private var isLocked: Bool { block?.isActive == true }
@@ -53,7 +54,11 @@ struct SettingsView: View {
 
                 if let keyholder = state.snapshot?.keyholder {
                     Section {
-                        Text(keyholder.profile.displayName)
+                        HStack {
+                            Text(keyholder.profile.displayName)
+                            Spacer()
+                            Button("Rename") { renameTarget = keyholder.profile }
+                        }
                         Button("Remove keyholder", role: .destructive) {
                             Task { await state.endKey(keyholder.key) }
                         }
@@ -71,9 +76,12 @@ struct SettingsView: View {
                             HStack {
                                 Text(item.profile.displayName)
                                 Spacer()
+                                Button("Rename") { renameTarget = item.profile }
+                                    .buttonStyle(.borderless)
                                 Button("Stop holding", role: .destructive) {
                                     Task { await state.endKey(item.key) }
                                 }
+                                .buttonStyle(.borderless)
                                 .disabled(item.block?.isActive == true || state.busy)
                             }
                         }
@@ -96,6 +104,7 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .renameAlert($renameTarget)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }

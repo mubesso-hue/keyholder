@@ -306,11 +306,48 @@ final class AppState: ObservableObject {
             return
         }
         screenTime.persistSelection()
+
+        // The allowance is stored before locking so the very first shields
+        // already leave its apps open.
+        let allowance = screenTime.allowanceMinutes
+        let useAllowance = allowance > 0 && !AppChangePlan.isEmpty(screenTime.allowanceSelection)
+        UserDefaults.standard.set(allowance, forKey: "lastAllowanceMinutes")
+        SharedStore.allowanceSelection = screenTime.allowanceSelection
+        SharedStore.allowanceMinutes = useAllowance ? allowance : 0
+        SharedStore.allowanceExhaustedDay = nil
+        SharedStore.setAllowanceUsed(0)
+        MonitorScheduler.cancel(.allowance)
+
         await run {
             _ = try await self.api.startBlock(coolingOffHours: coolingOffHours, mode: mode,
                                               appCount: counts.apps, categoryCount: counts.categories,
                                               allowedCount: allowedCount)
         }
+        guard snapshot?.block?.isActive == true else {
+            SharedStore.allowanceMinutes = 0
+            return
+        }
+        if useAllowance {
+            // Tells the keyholder; the phone already enforces it.
+            _ = try? await api.setBlockAllowance(minutes: allowance)
+            await refresh()
+        }
+    }
+
+    /// Ends the daily allowance for this block: its apps block right away.
+    /// Turning it back on is the keyholder's call, so it stays off until the block ends.
+    func turnOffAllowance() async {
+        SharedStore.allowanceMinutes = 0
+        MonitorScheduler.cancel(.allowance)
+        if snapshot?.block?.isTemporarilyUnlocked(at: serverNow) != true {
+            ShieldController.applyStoredShields()
+        }
+        await run { _ = try await self.api.setBlockAllowance(minutes: 0) }
+    }
+
+    /// Your private name for someone you're tied to. Empty goes back to their own name.
+    func rename(_ profile: Profile, to name: String) async {
+        await run { try await self.api.setNickname(target: profile.id, name: name) }
     }
 
     func requestUnlock(_ duration: UnlockDuration) async {

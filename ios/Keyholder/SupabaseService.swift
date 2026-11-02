@@ -207,6 +207,22 @@ final class SupabaseService {
         )).execute().value
     }
 
+    // MARK: Nicknames and allowance (migration 0008)
+
+    private struct NicknameParams: Encodable {
+        let pTarget: String
+        let pName: String
+    }
+
+    /// An empty name clears the nickname.
+    func setNickname(target: UUID, name: String) async throws {
+        try await client.rpc("set_nickname", params: NicknameParams(pTarget: target.uuidString, pName: name)).execute()
+    }
+
+    func setBlockAllowance(minutes: Int) async throws -> Block {
+        try await client.rpc("set_block_allowance", params: ["p_minutes": minutes]).execute().value
+    }
+
     // MARK: Device and profile
 
     private struct RegisterDeviceParams: Encodable {

@@ -14,6 +14,10 @@ final class ScreenTimeController: ObservableObject {
     @Published var allowedSelection: FamilyActivitySelection =
         SharedStore.allowedSelection ?? FamilyActivitySelection(includeEntireCategory: true)
     @Published var mode: BlockMode = SharedStore.blockMode
+    /// Daily allowance chosen at Lock: minutes a day on `allowanceSelection`. 0 = none.
+    @Published var allowanceMinutes: Int = UserDefaults.standard.integer(forKey: "lastAllowanceMinutes")
+    @Published var allowanceSelection: FamilyActivitySelection =
+        SharedStore.allowanceSelection ?? FamilyActivitySelection(includeEntireCategory: true)
     @Published private(set) var lastError: String?
 
     var isAuthorized: Bool { status == .approved }
@@ -62,7 +66,7 @@ final class ScreenTimeController: ObservableObject {
 
         guard let block, block.isActive else {
             ShieldController.clearEverything()
-            MonitorScheduler.cancel(.unlockWindow, .breakGlass)
+            MonitorScheduler.cancel(.unlockWindow, .breakGlass, .allowance)
             SharedStore.clearBlockState()
             return
         }
@@ -90,5 +94,6 @@ final class ScreenTimeController: ObservableObject {
         }
 
         MonitorScheduler.ensureDailyHeartbeat()
+        MonitorScheduler.ensureAllowance()
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 /// Main screen. Full-bleed landscape, one big Lock, everything else steps back.
 struct HomeView: View {
     @EnvironmentObject private var state: AppState
+    @State private var renameTarget: Profile?
 
     var body: some View {
         NavigationStack {
@@ -22,7 +23,7 @@ struct HomeView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     TrackedLabel(text: "KEYS YOU HOLD")
                                     ForEach(snapshot.held) { held in
-                                        HeldKeyRow(held: held)
+                                        HeldKeyRow(held: held) { renameTarget = held.profile }
                                     }
                                 }
                                 .padding(.top, 22)
@@ -45,6 +46,7 @@ struct HomeView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await state.refresh() }
+            .renameAlert($renameTarget)
             .sheet(item: $state.sheet) { sheet in
                 switch sheet {
                 case .lock: LockFlowView()
@@ -104,6 +106,7 @@ struct HeroView: View {
     @EnvironmentObject private var state: AppState
     let snapshot: Snapshot
     var compact = false
+    @State private var confirmAllowanceOff = false
 
     private var holderName: String { snapshot.keyholder?.profile.displayName ?? "your keyholder" }
 
@@ -151,6 +154,11 @@ struct HeroView: View {
                 if let endsAt = block.breakGlassEndsAt {
                     breakGlassPanel(endsAt: endsAt, now: now)
                         .padding(.top, 4)
+                }
+
+                if SharedStore.allowanceMinutes > 0 {
+                    allowanceLine
+                        .padding(.bottom, 4)
                 }
 
                 actions(block)
@@ -207,11 +215,22 @@ struct HeroView: View {
                     .disabled(state.busy)
             }
 
-            Button("Change apps") { state.sheet = .editApps }
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Theme.white60)
-                .padding(.top, 6)
-                .legibleOnPhoto()
+            HStack(spacing: 10) {
+                Button("Change apps") { state.sheet = .editApps }
+                if SharedStore.allowanceMinutes > 0 {
+                    Text("·")
+                    Button("Turn off allowance") { confirmAllowanceOff = true }
+                }
+            }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.white60)
+            .padding(.top, 6)
+            .legibleOnPhoto()
+            .confirmationDialog("Turn off your daily allowance?", isPresented: $confirmAllowanceOff, titleVisibility: .visible) {
+                Button("Turn off", role: .destructive) { Task { await state.turnOffAllowance() } }
+            } message: {
+                Text("Those apps block right away. Only \(holderName) can give you time after that.")
+            }
 
             if state.pendingAppChange != nil, let change = snapshot.myAppChange?.change {
                 Text("Waiting for \(holderName) to OK your app change: \(change.request).")
@@ -223,6 +242,25 @@ struct HeroView: View {
             }
         }
         .frame(maxWidth: 300)
+    }
+
+    /// "Daily allowance: about 10 of 30 min used" or "used up, back at midnight".
+    private var allowanceLine: some View {
+        let total = SharedStore.allowanceMinutes
+        let used = min(SharedStore.allowanceUsedToday, total)
+        let text: String
+        if !SharedStore.allowanceAvailableToday {
+            text = "Today's allowance is used up. Your apps open again at midnight."
+        } else if used == 0 {
+            text = "Daily allowance: \(UnlockDuration.format(minutes: total)) left today."
+        } else {
+            text = "Daily allowance: about \(UnlockDuration.format(minutes: total - used)) left today."
+        }
+        return Text(text)
+            .font(Theme.helper)
+            .foregroundStyle(Theme.white60)
+            .fixedSize(horizontal: false, vertical: true)
+            .legibleOnPhoto()
     }
 
     // Ready to lock -----------------------------------------------------------
@@ -311,6 +349,7 @@ struct HeroView: View {
 struct HeldKeyRow: View {
     @EnvironmentObject private var state: AppState
     let held: HeldKey
+    var onRename: () -> Void = {}
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -386,6 +425,9 @@ struct HeldKeyRow: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glass()
+            .contextMenu {
+                Button { onRename() } label: { Label("Rename…", systemImage: "pencil") }
+            }
         }
     }
 

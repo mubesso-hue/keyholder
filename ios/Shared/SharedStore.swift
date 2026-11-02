@@ -22,6 +22,11 @@ enum SharedStore {
         static let blockMode = "blockMode"
         static let allowedSelection = "allowedSelection"
         static let pendingAppChange = "pendingAppChange"
+        static let allowanceMinutes = "allowanceMinutes"
+        static let allowanceSelection = "allowanceSelection"
+        static let allowanceExhaustedDay = "allowanceExhaustedDay"
+        static let allowanceUsedDay = "allowanceUsedDay"
+        static let allowanceUsedMinutes = "allowanceUsedMinutes"
     }
 
     // MARK: Blocked apps
@@ -84,6 +89,57 @@ enum SharedStore {
                 defaults.removeObject(forKey: Key.pendingAppChange)
             }
         }
+    }
+
+    // MARK: Daily allowance
+
+    /// Minutes a day the current block allows on `allowanceSelection`. 0 = none.
+    static var allowanceMinutes: Int {
+        get { defaults.integer(forKey: Key.allowanceMinutes) }
+        set { defaults.set(newValue, forKey: Key.allowanceMinutes) }
+    }
+
+    /// The apps the allowance covers. Remembered between locks.
+    static var allowanceSelection: FamilyActivitySelection? {
+        get {
+            guard let data = defaults.data(forKey: Key.allowanceSelection) else { return nil }
+            return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: Key.allowanceSelection)
+            } else {
+                defaults.removeObject(forKey: Key.allowanceSelection)
+            }
+        }
+    }
+
+    /// The day ("2026-11-02") the allowance ran out. Tomorrow it's available again.
+    static var allowanceExhaustedDay: String? {
+        get { defaults.string(forKey: Key.allowanceExhaustedDay) }
+        set { defaults.set(newValue, forKey: Key.allowanceExhaustedDay) }
+    }
+
+    /// Roughly how much of today's allowance is used, in 5-minute steps.
+    static var allowanceUsedToday: Int {
+        defaults.string(forKey: Key.allowanceUsedDay) == today ? defaults.integer(forKey: Key.allowanceUsedMinutes) : 0
+    }
+
+    static func setAllowanceUsed(_ minutes: Int) {
+        defaults.set(today, forKey: Key.allowanceUsedDay)
+        defaults.set(minutes, forKey: Key.allowanceUsedMinutes)
+    }
+
+    /// True while today's allowance apps may be open.
+    static var allowanceAvailableToday: Bool {
+        guard allowanceMinutes > 0, allowanceExhaustedDay != today,
+              let selection = allowanceSelection, !AppChangePlan.isEmpty(selection) else { return false }
+        return true
+    }
+
+    static var today: String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
     // MARK: Block state mirrored from the server
@@ -153,5 +209,7 @@ enum SharedStore {
         breakGlassEndsAt = nil
         pendingShieldRequestAt = nil
         pendingAppChange = nil
+        allowanceMinutes = 0
+        allowanceExhaustedDay = nil
     }
 }

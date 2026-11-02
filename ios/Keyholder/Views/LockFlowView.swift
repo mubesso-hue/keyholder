@@ -1,7 +1,7 @@
 import SwiftUI
 import FamilyControls
 
-/// Choose how to lock → pick apps → choose cooling-off → confirm.
+/// Choose how to lock → pick apps → daily allowance → choose cooling-off → confirm.
 struct LockFlowView: View {
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var screenTime: ScreenTimeController
@@ -11,6 +11,7 @@ struct LockFlowView: View {
     @State private var confirming = false
 
     private let coolingOffChoices = [12, 24, 48, 72]
+    private let allowanceChoices = [0, 15, 30, 45, 60]
 
     var body: some View {
         NavigationStack {
@@ -93,12 +94,16 @@ struct LockFlowView: View {
         VStack(spacing: 0) {
             if screenTime.mode == .allExcept {
                 FamilyActivityPicker(
-                    headerText: "Pick the apps that stay open. Tap a category such as Finance or Navigation to keep all of its apps. Your choice is remembered for next time.",
+                    headerText: "Pick the apps that stay open. Tap a category such as Finance or Navigation to keep all of its apps. Your choice is remembered for next time. If a category looks empty, search for the app by name.",
                     footerText: nil,
                     selection: $screenTime.allowedSelection
                 )
             } else {
-                FamilyActivityPicker(selection: $screenTime.selection)
+                FamilyActivityPicker(
+                    headerText: "Pick the apps or categories to block. If a category looks empty, search for the app by name.",
+                    footerText: nil,
+                    selection: $screenTime.selection
+                )
             }
 
             Divider()
@@ -109,7 +114,7 @@ struct LockFlowView: View {
                     .foregroundStyle(.secondary)
 
                 NavigationLink {
-                    coolingOff
+                    allowanceStep
                 } label: {
                     Text("Next").frame(maxWidth: .infinity)
                 }
@@ -140,7 +145,72 @@ struct LockFlowView: View {
         return counts.apps + counts.categories > 0
     }
 
-    // MARK: Step 3 — cooling-off and confirm
+    // MARK: Step 3 — daily allowance
+
+    private var holderName: String { state.snapshot?.keyholder?.profile.displayName ?? "your keyholder" }
+
+    private var allowanceIsValid: Bool {
+        screenTime.allowanceMinutes == 0 || !AppChangePlan.isEmpty(screenTime.allowanceSelection)
+    }
+
+    private var allowanceAppsSummary: String {
+        let c = AppChangePlan.counts(screenTime.allowanceSelection)
+        return c.apps + c.categories == 0 ? "None yet" : AppChange.describe(apps: c.apps, categories: c.categories)
+    }
+
+    private var allowanceStep: some View {
+        List {
+            Section {
+                Picker("Allowance", selection: $screenTime.allowanceMinutes) {
+                    ForEach(allowanceChoices, id: \.self) { m in
+                        Text(m == 0 ? "Off" : UnlockDuration.format(minutes: m)).tag(m)
+                    }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Minutes a day before it fully blocks")
+            } footer: {
+                Text("Use the apps you choose for a few minutes a day. Once the time is used up, they block until midnight. You can turn it off while locked, but only \(holderName) can give you more.")
+            }
+
+            if screenTime.allowanceMinutes > 0 {
+                Section {
+                    NavigationLink {
+                        FamilyActivityPicker(
+                            headerText: "Pick the apps you can use for \(UnlockDuration.format(minutes: screenTime.allowanceMinutes)) a day in total. If a category looks empty, search for the app by name.",
+                            footerText: nil,
+                            selection: $screenTime.allowanceSelection
+                        )
+                        .navigationTitle("Allowance apps")
+                        .navigationBarTitleDisplayMode(.inline)
+                    } label: {
+                        LabeledContent("Apps it covers", value: allowanceAppsSummary)
+                    }
+                } footer: {
+                    if !allowanceIsValid { Text("Choose at least one app.") }
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    coolingOff
+                } label: {
+                    Text("Next").fontWeight(.semibold)
+                }
+                .disabled(!allowanceIsValid)
+            }
+        }
+        .navigationTitle("Daily allowance")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // In "only the apps I pick" mode, start from the blocked apps.
+            if screenTime.mode == .selected && AppChangePlan.isEmpty(screenTime.allowanceSelection) {
+                screenTime.allowanceSelection = screenTime.selection
+            }
+        }
+    }
+
+    // MARK: Step 4 — cooling-off and confirm
 
     private var coolingOff: some View {
         let holder = state.snapshot?.keyholder?.profile.displayName ?? "your keyholder"
@@ -181,7 +251,10 @@ struct LockFlowView: View {
                     }
                 }
             } message: {
-                Text("Only \(holder) can give you time back. Break Glass takes \(coolingOffHours) hours.")
+                Text("Only \(holder) can give you time back. Break Glass takes \(coolingOffHours) hours."
+                     + (screenTime.allowanceMinutes > 0 && allowanceIsValid
+                        ? " You get \(UnlockDuration.format(minutes: screenTime.allowanceMinutes)) a day on \(allowanceAppsSummary)."
+                        : ""))
             }
         }
         .padding()

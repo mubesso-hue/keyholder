@@ -13,6 +13,32 @@ final class MonitorExtension: DeviceActivityMonitor {
         if activity == .heartbeat {
             postHeartbeat()
         }
+        if activity == .allowance {
+            // A new day: the allowance apps open again.
+            SharedStore.allowanceExhaustedDay = nil
+            SharedStore.setAllowanceUsed(0)
+            reapplyShieldsIfLocked()
+        }
+    }
+
+    override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
+        super.eventDidReachThreshold(event, activity: activity)
+        guard activity == .allowance else { return }
+        if event == .allowanceDone {
+            SharedStore.note("allowance used up")
+            SharedStore.allowanceExhaustedDay = SharedStore.today
+            SharedStore.setAllowanceUsed(SharedStore.allowanceMinutes)
+            reapplyShieldsIfLocked()
+        } else if let minutes = event.allowanceUsedMinutes {
+            SharedStore.setAllowanceUsed(max(SharedStore.allowanceUsedToday, minutes))
+        }
+    }
+
+    /// Shields follow the allowance, except during time the keyholder gave.
+    private func reapplyShieldsIfLocked() {
+        guard SharedStore.blockActive else { return }
+        if let until = SharedStore.unlockUntil, until > Date() { return }
+        ShieldController.applyStoredShields()
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
