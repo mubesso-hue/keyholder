@@ -134,3 +134,34 @@ struct GradientDusk: View {
         }
     }
 }
+
+/// The current scene, heavily blurred and darkened: a calm backdrop for flows
+/// full of text and controls, such as Lock.
+struct BlurredLandscape: View {
+    var imageName: String = BackgroundLibrary.current
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                if let image = UIImage(named: imageName) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .blur(radius: 32)
+                        .saturation(1.15)
+                        .scaleEffect(1.15)
+                        .clipped()
+                } else {
+                    Theme.ink
+                }
+                LinearGradient(stops: [
+                    .init(color: Theme.ink.opacity(0.50), location: 0.0),
+                    .init(color: Theme.ink.opacity(0.58), location: 0.5),
+                    .init(color: Theme.ink.opacity(0.86), location: 1.0),
+                ], startPoint: .top, endPoint: .bottom)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
