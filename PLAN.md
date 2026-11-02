@@ -43,6 +43,14 @@ Decisions already made:
   only counts ("keep 2 more apps open"), never which apps. One app change can
   wait at a time; a new one replaces it. Shortening cooling-off or removing your
   keyholder still needs an ended block.
+
+**Daily allowance**
+- Optional, chosen at Lock: N minutes a day on apps you pick. Screen Time counts
+  the minutes on the phone; when they're used up those apps block until midnight.
+- The keyholder can set it to any size at any time (key page → Change). The
+  locked person can turn it down or off, and can ask for more; the keyholder
+  approves or says no.
+- A change mid-day keeps the minutes already used today.
 - A keyholder may resign only when the person they guard has no active block.
 
 **Streak** (continuous time with a live block)
