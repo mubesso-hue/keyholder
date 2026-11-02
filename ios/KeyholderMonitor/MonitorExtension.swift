@@ -14,16 +14,17 @@ final class MonitorExtension: DeviceActivityMonitor {
             postHeartbeat()
         }
         if activity == .allowance {
-            // A new day: the allowance apps open again.
-            SharedStore.allowanceExhaustedDay = nil
-            SharedStore.setAllowanceUsed(0)
+            // At midnight the allowance apps open again. Used minutes and the
+            // used-up flag are stored with their day, so yesterday's no longer
+            // count. (iOS may also call this when counting restarts mid-day;
+            // nothing is reset here, so today's count survives.)
             reapplyShieldsIfLocked()
         }
     }
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
-        guard activity == .allowance else { return }
+        guard activity == .allowance || activity == .allowanceToday else { return }
         if event == .allowanceDone {
             SharedStore.note("allowance used up")
             SharedStore.allowanceExhaustedDay = SharedStore.today

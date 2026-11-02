@@ -66,7 +66,7 @@ final class ScreenTimeController: ObservableObject {
 
         guard let block, block.isActive else {
             ShieldController.clearEverything()
-            MonitorScheduler.cancel(.unlockWindow, .breakGlass, .allowance)
+            MonitorScheduler.cancel(.unlockWindow, .breakGlass, .allowance, .allowanceToday)
             SharedStore.clearBlockState()
             return
         }

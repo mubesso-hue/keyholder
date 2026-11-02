@@ -27,6 +27,7 @@ enum SharedStore {
         static let allowanceExhaustedDay = "allowanceExhaustedDay"
         static let allowanceUsedDay = "allowanceUsedDay"
         static let allowanceUsedMinutes = "allowanceUsedMinutes"
+        static let allowanceSetAt = "allowanceSetAt"
     }
 
     // MARK: Blocked apps
@@ -112,6 +113,13 @@ enum SharedStore {
                 defaults.removeObject(forKey: Key.allowanceSelection)
             }
         }
+    }
+
+    /// When this phone last applied an allowance change, in server time. A
+    /// change on the server that is newer (from the keyholder) replaces it.
+    static var allowanceSetAt: Date? {
+        get { defaults.object(forKey: Key.allowanceSetAt) as? Date }
+        set { defaults.set(newValue, forKey: Key.allowanceSetAt) }
     }
 
     /// The day ("2026-11-02") the allowance ran out. Tomorrow it's available again.
@@ -211,5 +219,6 @@ enum SharedStore {
         pendingAppChange = nil
         allowanceMinutes = 0
         allowanceExhaustedDay = nil
+        allowanceSetAt = nil
     }
 }

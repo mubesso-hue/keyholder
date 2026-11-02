@@ -397,6 +397,50 @@ select pg_temp.as_user(:'sarah');
 select pg_temp.assert_raises($$select public.key_history('$$ || :'tom' || $$')$$, 'do not hold');
 select pg_temp.as_user(:'marc');
 
+-- Keyholder controls the allowance --------------------------------------------------
+select allowance_minutes as holder_set from public.holder_set_allowance(:'tom', 45) \gset
+select pg_temp.ok(:holder_set = 45, 'keyholder sets the allowance');
+select pg_temp.ok((select allowance_set_at is not null from public.blocks where id = :'tom_block'), 'allowance change is time-stamped');
+select pg_temp.ok((select user_id = :'tom' and body = 'It''s now 45 min a day.' from public.notifications
+                    where category = 'ALLOWANCE_CHANGED' order by id desc limit 1), 'locked person told of the new allowance');
+select pg_temp.as_user(:'sarah');
+select pg_temp.assert_raises($$select public.holder_set_allowance('$$ || :'tom' || $$', 10)$$, 'do not hold an active block');
+
+select pg_temp.as_user(:'tom');
+select pg_temp.assert_raises('select public.request_allowance(30)', 'more than you have now');
+select id as allow_req1 from public.request_allowance(60) \gset
+select pg_temp.ok(((public.me_snapshot() -> 'my_allowance_request' ->> 'minutes')::int) = 60, 'snapshot shows my allowance request');
+select pg_temp.ok((select user_id = :'marc' and title = 'Tommy wants a bigger daily allowance' and body = 'From 45 min to 1 h a day.'
+                     from public.notifications where category = 'ALLOWANCE_REQUEST' order by id desc limit 1), 'keyholder asked for more allowance');
+select pg_temp.as_user(:'marc');
+select pg_temp.ok((select (h -> 'pending_allowance' ->> 'minutes')::int = 60
+                     from jsonb_array_elements(public.me_snapshot() -> 'held') h
+                    where h -> 'profile' ->> 'id' = :'tom'), 'keyholder sees the allowance request');
+select status as allow_dec1 from public.decide_allowance(:'allow_req1', false) \gset
+select pg_temp.ok(:'allow_dec1' = 'denied', 'keyholder can say no');
+select pg_temp.ok((select allowance_minutes = 45 from public.blocks where id = :'tom_block'), 'a no keeps the allowance');
+select pg_temp.ok((select body = 'It stays at 45 min a day.' from public.notifications
+                    where category = 'ALLOWANCE_DECIDED' order by id desc limit 1), 'locked person told it stays');
+
+select pg_temp.as_user(:'tom');
+select id as allow_req2 from public.request_allowance(60) \gset
+select pg_temp.as_user(:'marc');
+select public.decide_allowance(:'allow_req2', true);
+select pg_temp.ok((select allowance_minutes = 60 from public.blocks where id = :'tom_block'), 'approval raises the allowance');
+select pg_temp.assert_raises($$select public.decide_allowance('$$ || :'allow_req2' || $$', true)$$, 'already decided');
+
+select pg_temp.as_user(:'tom');
+select id as allow_req3 from public.request_allowance(90) \gset
+select pg_temp.as_user(:'marc');
+select public.holder_set_allowance(:'tom', 120);
+select pg_temp.ok((select status = 'approved' from public.allowance_requests where id = :'allow_req3'), 'a bigger setting answers the open request');
+
+select pg_temp.as_user(:'tom');
+select allowance_minutes as tom_down from public.set_block_allowance(30) \gset
+select pg_temp.ok(:tom_down = 30, 'locked person can turn it down');
+select pg_temp.assert_raises('select public.set_block_allowance(60)', 'only your keyholder');
+select pg_temp.as_user(:'marc');
+
 -- Unauthenticated callers are rejected.
 select pg_temp.as_nobody();
 select pg_temp.assert_raises('select public.me_snapshot()', 'not authenticated');

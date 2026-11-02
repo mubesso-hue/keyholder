@@ -223,6 +223,37 @@ final class SupabaseService {
         try await client.rpc("set_block_allowance", params: ["p_minutes": minutes]).execute().value
     }
 
+    // MARK: Allowance control (migration 0010)
+
+    private struct HolderAllowanceParams: Encodable {
+        let pLockedId: String
+        let pMinutes: Int
+    }
+
+    /// The keyholder sets someone's daily allowance. 0 turns it off.
+    func holderSetAllowance(lockedID: UUID, minutes: Int) async throws -> Block {
+        try await client.rpc("holder_set_allowance", params: HolderAllowanceParams(
+            pLockedId: lockedID.uuidString, pMinutes: minutes)).execute().value
+    }
+
+    func requestAllowance(minutes: Int) async throws -> AllowanceRequest {
+        try await client.rpc("request_allowance", params: ["p_minutes": minutes]).execute().value
+    }
+
+    private struct DecideAllowanceParams: Encodable {
+        let pRequestId: String
+        let pApprove: Bool
+    }
+
+    func decideAllowance(requestID: UUID, approve: Bool) async throws -> AllowanceRequest {
+        try await client.rpc("decide_allowance", params: DecideAllowanceParams(
+            pRequestId: requestID.uuidString, pApprove: approve)).execute().value
+    }
+
+    func cancelAllowanceRequest() async throws {
+        try await client.rpc("cancel_allowance_request").execute()
+    }
+
     func keyHistory(lockedID: UUID) async throws -> KeyHistory {
         try await client.rpc("key_history", params: ["p_locked_id": lockedID.uuidString]).execute().value
     }

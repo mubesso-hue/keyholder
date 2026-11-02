@@ -12,6 +12,7 @@ struct KeyDetailView: View {
     @State private var showCustom = false
     @State private var confirmEnd = false
     @State private var confirmStop = false
+    @State private var choosingAllowance = false
 
     private var held: HeldKey? { state.snapshot?.held.first { $0.id == keyID } }
 
@@ -85,6 +86,9 @@ struct KeyDetailView: View {
             }
             if block != nil, let change = held.pendingAppChange {
                 appChangeCard(held, change: change)
+            }
+            if let block, let ask = held.pendingAllowance {
+                allowanceRequestCard(held, ask: ask, current: block.allowanceMinutes ?? 0)
             }
             if let block, held.pendingRequest == nil {
                 giveTimeCard(held, block: block)
@@ -275,6 +279,28 @@ struct KeyDetailView: View {
         .attentionCard()
     }
 
+    private func allowanceRequestCard(_ held: HeldKey, ask: AllowanceRequest, current: Int) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                TrackedLabel(text: "DAILY ALLOWANCE", color: Theme.orangeLight)
+                Text("Wants \(UnlockDuration.format(minutes: ask.minutes)) a day")
+                    .font(.system(size: 22, weight: .semibold))
+                Text(current > 0 ? "Now \(UnlockDuration.format(minutes: current)) a day." : "They have no allowance now.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.white60)
+            }
+            HStack(spacing: 8) {
+                Button("Approve") { Task { await state.decideAllowance(requestID: ask.id, approve: true) } }
+                    .buttonStyle(OrangePillStyle())
+                Button("Say no") { Task { await state.decideAllowance(requestID: ask.id, approve: false) } }
+                    .buttonStyle(GlassPillStyle(fullWidth: true))
+            }
+        }
+        .foregroundStyle(.white)
+        .disabled(state.busy)
+        .attentionCard()
+    }
+
     private func giveTimeCard(_ held: HeldKey, block: Block) -> some View {
         let unlocked = block.isTemporarilyUnlocked(at: state.serverNow)
         let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
@@ -308,24 +334,49 @@ struct KeyDetailView: View {
 
     private func blockSection(_ held: HeldKey, block: Block) -> some View {
         let mutual = state.snapshot?.keyholder?.profile.id == held.profile.id
-        var rows: [(String, String)] = [("Blocking", blockingText(block))]
-        if let m = block.allowanceMinutes, m > 0 {
-            rows.append(("Daily allowance", "\(UnlockDuration.format(minutes: m)) a day"))
-        }
-        rows.append(("Break Glass wait", "\(block.coolingOffHours) hours"))
-        rows.append(("Pact", mutual ? "Mutual: they hold your key too" : "You hold their key"))
+        let allowance = block.allowanceMinutes ?? 0
         return section("THEIR BLOCK") {
-            ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(row.0).font(.system(size: 14)).foregroundStyle(Theme.white40)
-                    Spacer()
-                    Text(row.1).font(.system(size: 15)).multilineTextAlignment(.trailing)
+            infoRow("Blocking", blockingText(block))
+            rowDivider
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Daily allowance").font(.system(size: 14)).foregroundStyle(Theme.white40)
+                    Text(allowance > 0 ? "\(UnlockDuration.format(minutes: allowance)) a day" : "Off")
+                        .font(.system(size: 15))
                 }
-                .padding(.vertical, 14)
-                if index < rows.count - 1 { Divider().overlay(Color.white.opacity(0.10)) }
+                Spacer()
+                Button("Change") { choosingAllowance = true }
+                    .buttonStyle(GlassPillStyle(compact: true))
+                    .disabled(state.busy)
             }
+            .padding(.vertical, 10)
+            .confirmationDialog("\(held.profile.displayName)'s daily allowance", isPresented: $choosingAllowance,
+                                titleVisibility: .visible) {
+                ForEach([0, 15, 30, 45, 60, 90, 120], id: \.self) { m in
+                    Button(m == 0 ? "Off" : "\(UnlockDuration.format(minutes: m)) a day" + (m == allowance ? " (now)" : "")) {
+                        Task { await state.setAllowance(for: held, minutes: m) }
+                    }
+                }
+            } message: {
+                Text("Minutes a day on the apps they chose. It counts what they've already used today, and they're told right away.")
+            }
+            rowDivider
+            infoRow("Break Glass wait", "\(block.coolingOffHours) hours")
+            rowDivider
+            infoRow("Pact", mutual ? "Mutual: they hold your key too" : "You hold their key")
         }
     }
+
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label).font(.system(size: 14)).foregroundStyle(Theme.white40)
+            Spacer()
+            Text(value).font(.system(size: 15)).multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 14)
+    }
+
+    private var rowDivider: some View { Divider().overlay(Color.white.opacity(0.10)) }
 
     private func weekSection(_ held: HeldKey) -> some View {
         section("THIS WEEK") {

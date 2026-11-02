@@ -36,10 +36,13 @@ enum PushRegistrar {
         static let deny = "DENY"
         static let approveApps = "APPROVE_APPS"
         static let denyApps = "DENY_APPS"
+        static let approveAllowance = "APPROVE_ALLOWANCE"
+        static let denyAllowance = "DENY_ALLOWANCE"
     }
 
     static let unlockRequestCategory = "UNLOCK_REQUEST"
     static let appChangeRequestCategory = "APP_CHANGE_REQUEST"
+    static let allowanceRequestCategory = "ALLOWANCE_REQUEST"
     static var heartbeatTaskID: String { "\(Bundle.main.bundleIdentifier ?? "com.keyholder.app").heartbeat" }
 
     static func configureCategories() {
@@ -61,7 +64,14 @@ enum PushRegistrar {
         let appChange = UNNotificationCategory(identifier: appChangeRequestCategory,
                                                actions: [approveApps, denyApps],
                                                intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([category, appChange])
+        let approveAllowance = UNNotificationAction(identifier: Action.approveAllowance, title: "Approve",
+                                                    options: [.authenticationRequired])
+        let denyAllowance = UNNotificationAction(identifier: Action.denyAllowance, title: "Say no",
+                                                 options: [.authenticationRequired, .destructive])
+        let allowance = UNNotificationCategory(identifier: allowanceRequestCategory,
+                                               actions: [approveAllowance, denyAllowance],
+                                               intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category, appChange, allowance])
     }
 
     static func requestPermissionAndRegister() async {

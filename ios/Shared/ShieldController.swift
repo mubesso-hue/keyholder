@@ -14,6 +14,8 @@ extension DeviceActivityName {
     static let breakGlass = Self("breakGlass")
     /// Daily, midnight to midnight: counts the minutes used on allowance apps.
     static let allowance = Self("allowance")
+    /// Today only, after the allowance changed mid-day: caps today at what's left.
+    static let allowanceToday = Self("allowanceToday")
     /// Daily schedule whose callbacks give the extension a chance to send a heartbeat.
     static let heartbeat = Self("heartbeat")
 }
@@ -164,10 +166,56 @@ enum MonitorScheduler {
         try center.startMonitoring(.allowance, during: schedule, events: events)
     }
 
+    /// Changes the allowance's size or apps mid-day without forgetting what's
+    /// already used today. Restarting the daily count would start from zero, so
+    /// a separate today-only count caps today at what's left.
+    static func restartAllowance(minutes: Int, selection: FamilyActivitySelection) {
+        let usedToday = SharedStore.allowanceUsedToday
+        SharedStore.allowanceMinutes = minutes
+        SharedStore.allowanceSelection = selection
+        cancel(.allowance, .allowanceToday)
+        guard minutes > 0, !AppChangePlan.isEmpty(selection) else { return }
+
+        try? startAllowance(minutes: minutes, selection: selection)
+        let remaining = minutes - usedToday
+        if remaining <= 0 {
+            SharedStore.allowanceExhaustedDay = SharedStore.today
+            return
+        }
+        if SharedStore.allowanceExhaustedDay == SharedStore.today {
+            SharedStore.allowanceExhaustedDay = nil
+        }
+        guard usedToday > 0 else { return }
+
+        // Today's cap: what's left, counted from now until midnight.
+        let calendar = Calendar.current
+        let now = Date()
+        guard let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 0, of: now),
+              endOfDay.timeIntervalSince(now) >= minimumInterval else { return }
+        func event(after m: Int) -> DeviceActivityEvent {
+            DeviceActivityEvent(applications: selection.applicationTokens,
+                                categories: selection.categoryTokens,
+                                webDomains: selection.webDomainTokens,
+                                threshold: DateComponents(minute: m))
+        }
+        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [.allowanceDone: event(after: remaining)]
+        for m in stride(from: 5, to: remaining, by: 5) {
+            events[.allowanceUsed(usedToday + m)] = event(after: m)
+        }
+        let components: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: calendar.dateComponents(components, from: now),
+            intervalEnd: calendar.dateComponents(components, from: endOfDay),
+            repeats: false
+        )
+        try? DeviceActivityCenter().startMonitoring(.allowanceToday, during: schedule, events: events)
+    }
+
     /// Starts allowance counting if the block has one and it isn't running yet.
     static func ensureAllowance() {
-        guard SharedStore.allowanceMinutes > 0, let selection = SharedStore.allowanceSelection else {
-            cancel(.allowance)
+        guard SharedStore.allowanceMinutes > 0, let selection = SharedStore.allowanceSelection,
+              !AppChangePlan.isEmpty(selection) else {
+            cancel(.allowance, .allowanceToday)
             return
         }
         guard !DeviceActivityCenter().activities.contains(.allowance) else { return }

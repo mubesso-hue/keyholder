@@ -71,7 +71,7 @@ function apnsHost(): string {
 
 // Categories whose target device must act (drop or restore shields), so the
 // push also wakes the app in the background.
-const WAKES_APP = new Set(["UNLOCK_DECIDED", "BLOCK_ENDED", "KEY_ENDED", "APP_CHANGE_DECIDED"]);
+const WAKES_APP = new Set(["UNLOCK_DECIDED", "BLOCK_ENDED", "KEY_ENDED", "APP_CHANGE_DECIDED", "ALLOWANCE_CHANGED"]);
 
 type SendResult = { ok: boolean; status: number; reason?: string; host?: string };
 

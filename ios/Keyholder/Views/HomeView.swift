@@ -67,6 +67,8 @@ struct HomeView: View {
                 case .editApps:
                     let editor = state.appEditorStart()
                     EditAppsView(mode: editor.mode, current: editor.current, start: editor.start)
+                case .allowance:
+                    AllowanceSheet()
                 }
             }
         }
@@ -120,7 +122,6 @@ struct HeroView: View {
     @EnvironmentObject private var state: AppState
     let snapshot: Snapshot
     var compact = false
-    @State private var confirmAllowanceOff = false
 
     private var holderName: String { snapshot.keyholder?.profile.displayName ?? "your keyholder" }
 
@@ -170,10 +171,8 @@ struct HeroView: View {
                         .padding(.top, 4)
                 }
 
-                if SharedStore.allowanceMinutes > 0 {
-                    allowanceLine
-                        .padding(.bottom, 4)
-                }
+                allowanceStatus
+                    .padding(.bottom, 4)
 
                 actions(block)
                     .padding(.top, 18)
@@ -231,20 +230,13 @@ struct HeroView: View {
 
             HStack(spacing: 10) {
                 Button("Change apps") { state.sheet = .editApps }
-                if SharedStore.allowanceMinutes > 0 {
-                    Text("·")
-                    Button("Turn off allowance") { confirmAllowanceOff = true }
-                }
+                Text("·")
+                Button("Allowance") { state.sheet = .allowance }
             }
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(Theme.white60)
             .padding(.top, 6)
             .legibleOnPhoto()
-            .confirmationDialog("Turn off your daily allowance?", isPresented: $confirmAllowanceOff, titleVisibility: .visible) {
-                Button("Turn off", role: .destructive) { Task { await state.turnOffAllowance() } }
-            } message: {
-                Text("Those apps block right away. Only \(holderName) can give you time after that.")
-            }
 
             if state.pendingAppChange != nil, let change = snapshot.myAppChange?.change {
                 Text("Waiting for \(holderName) to OK your app change: \(change.request).")
@@ -258,23 +250,34 @@ struct HeroView: View {
         .frame(maxWidth: 300)
     }
 
-    /// "Daily allowance: about 10 of 30 min used" or "used up, back at midnight".
-    private var allowanceLine: some View {
+    /// The allowance bar, a prompt to choose its apps, and any request waiting.
+    @ViewBuilder
+    private var allowanceStatus: some View {
         let total = SharedStore.allowanceMinutes
-        let used = min(SharedStore.allowanceUsedToday, total)
-        let text: String
-        if !SharedStore.allowanceAvailableToday {
-            text = "Today's allowance is used up. Your apps open again at midnight."
-        } else if used == 0 {
-            text = "Daily allowance: \(UnlockDuration.format(minutes: total)) left today."
-        } else {
-            text = "Daily allowance: about \(UnlockDuration.format(minutes: total - used)) left today."
+        let hasApps = !(SharedStore.allowanceSelection.map(AppChangePlan.isEmpty) ?? true)
+        VStack(spacing: 10) {
+            if total > 0 && hasApps {
+                AllowanceBar(total: total, used: SharedStore.allowanceUsedToday,
+                             available: SharedStore.allowanceAvailableToday)
+            } else if total > 0 {
+                Button {
+                    state.sheet = .allowance
+                } label: {
+                    Text("\(holderName) gave you \(UnlockDuration.format(minutes: total)) a day. Choose its apps")
+                        .font(Theme.helper)
+                        .foregroundStyle(Theme.orangeLight)
+                        .multilineTextAlignment(.center)
+                        .legibleOnPhoto()
+                }
+            }
+            if let asked = snapshot.myAllowanceRequest {
+                Text("Asked \(holderName) for \(UnlockDuration.format(minutes: asked.minutes)) a day. Waiting…")
+                    .font(Theme.helper)
+                    .foregroundStyle(Theme.white60)
+                    .legibleOnPhoto()
+            }
         }
-        return Text(text)
-            .font(Theme.helper)
-            .foregroundStyle(Theme.white60)
-            .fixedSize(horizontal: false, vertical: true)
-            .legibleOnPhoto()
+        .frame(maxWidth: 300)
     }
 
     // Ready to lock -----------------------------------------------------------
@@ -400,6 +403,20 @@ struct HeldKeyRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Theme.white60)
                         .padding(.top, 4)
+
+                    if let ask = held.pendingAllowance {
+                        Text("Wants \(UnlockDuration.format(minutes: ask.minutes)) a day of allowance")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.top, 10)
+                        HStack(spacing: 6) {
+                            Button("Approve") { Task { await state.decideAllowance(requestID: ask.id, approve: true) } }
+                            Button("No") { Task { await state.decideAllowance(requestID: ask.id, approve: false) } }
+                        }
+                        .buttonStyle(GlassPillStyle(compact: true))
+                        .disabled(state.busy)
+                        .padding(.top, 10)
+                    }
 
                     if let change = held.pendingAppChange {
                         Text("Wants to \(change.change?.request ?? "change their apps")")

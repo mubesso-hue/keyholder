@@ -12,7 +12,7 @@ final class AppState: ObservableObject {
     enum Phase: Equatable { case loading, signedOut, signedIn }
 
     enum Sheet: Identifiable {
-        case lock, request, breakGlass, invite, settings, editApps
+        case lock, request, breakGlass, invite, settings, editApps, allowance
         case accept(code: String?)
         case decide(HeldKey)
 
@@ -24,6 +24,7 @@ final class AppState: ObservableObject {
             case .invite: return "invite"
             case .settings: return "settings"
             case .editApps: return "editApps"
+            case .allowance: return "allowance"
             case .accept: return "accept"
             case .decide(let held): return "decide-\(held.id)"
             }
@@ -120,6 +121,7 @@ final class AppState: ObservableObject {
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
             settlePendingAppChange(snap)
+            settleAllowance(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
             scheduleLocalTimers(for: snap.block)
             await checkAuthorizationAndHeartbeat(block: snap.block)
@@ -229,6 +231,29 @@ final class AppState: ObservableObject {
 
     private var revocationCheckInFlight = false
 
+    /// Keeps this phone's allowance in step with the server. A newer change on
+    /// the server (the keyholder's setting, or an approval) is applied, counting
+    /// what's already used today. If this phone turned it down and the server
+    /// missed it, the server is told again.
+    private func settleAllowance(_ snap: Snapshot) {
+        guard let block = snap.block, block.isActive else { return }
+        let server = block.allowanceMinutes ?? 0
+        let local = SharedStore.allowanceMinutes
+        let serverAt = block.allowanceSetAt ?? .distantPast
+        let localAt = SharedStore.allowanceSetAt ?? .distantPast
+        guard server != local else {
+            if serverAt > localAt { SharedStore.allowanceSetAt = serverAt }
+            return
+        }
+        if serverAt > localAt {
+            SharedStore.allowanceSetAt = serverAt
+            let selection = SharedStore.allowanceSelection ?? FamilyActivitySelection(includeEntireCategory: true)
+            MonitorScheduler.restartAllowance(minutes: server, selection: selection)
+        } else if local < server {
+            Task { [weak self] in _ = try? await self?.api.setBlockAllowance(minutes: local) }
+        }
+    }
+
     /// Applies an app change the keyholder approved, or drops one that was
     /// declined, withdrawn, expired or belongs to an earlier block. Runs before
     /// the shields are reconciled so an approval takes effect in the same pass.
@@ -270,6 +295,7 @@ final class AppState: ObservableObject {
             snapshot = snap
             clockOffset = snap.serverTime.timeIntervalSinceNow
             settlePendingAppChange(snap)
+            settleAllowance(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
         }
     }
@@ -318,7 +344,8 @@ final class AppState: ObservableObject {
         SharedStore.allowanceMinutes = useAllowance ? allowance : 0
         SharedStore.allowanceExhaustedDay = nil
         SharedStore.setAllowanceUsed(0)
-        MonitorScheduler.cancel(.allowance)
+        SharedStore.allowanceSetAt = serverNow
+        MonitorScheduler.cancel(.allowance, .allowanceToday)
 
         await run {
             _ = try await self.api.startBlock(coolingOffHours: coolingOffHours, mode: mode,
@@ -339,12 +366,44 @@ final class AppState: ObservableObject {
     /// Ends the daily allowance for this block: its apps block right away.
     /// Turning it back on is the keyholder's call, so it stays off until the block ends.
     func turnOffAllowance() async {
-        SharedStore.allowanceMinutes = 0
-        MonitorScheduler.cancel(.allowance)
-        if snapshot?.block?.isTemporarilyUnlocked(at: serverNow) != true {
-            ShieldController.applyStoredShields()
-        }
+        SharedStore.allowanceSetAt = serverNow
+        MonitorScheduler.restartAllowance(minutes: 0, selection: SharedStore.allowanceSelection ?? FamilyActivitySelection())
+        reapplyShieldsUnlessUnlocked()
         await run { _ = try await self.api.setBlockAllowance(minutes: 0) }
+    }
+
+    /// Picks which apps the allowance covers. The minutes stay the same, and
+    /// what's already used today still counts.
+    func setAllowanceApps(_ selection: FamilyActivitySelection) {
+        MonitorScheduler.restartAllowance(minutes: SharedStore.allowanceMinutes, selection: selection)
+        screenTime.allowanceSelection = selection
+        reapplyShieldsUnlessUnlocked()
+        objectWillChange.send()
+    }
+
+    /// Asks the keyholder for a bigger daily allowance.
+    func requestAllowance(minutes: Int) async {
+        await run { _ = try await self.api.requestAllowance(minutes: minutes) }
+    }
+
+    func withdrawAllowanceRequest() async {
+        await run { try await self.api.cancelAllowanceRequest() }
+    }
+
+    /// Keyholder answers a request for more allowance.
+    func decideAllowance(requestID: UUID, approve: Bool) async {
+        await run { _ = try await self.api.decideAllowance(requestID: requestID, approve: approve) }
+    }
+
+    /// Keyholder sets someone's daily allowance. 0 turns it off.
+    func setAllowance(for held: HeldKey, minutes: Int) async {
+        await run { _ = try await self.api.holderSetAllowance(lockedID: held.profile.id, minutes: minutes) }
+    }
+
+    private func reapplyShieldsUnlessUnlocked() {
+        guard snapshot?.block?.isActive == true,
+              snapshot?.block?.isTemporarilyUnlocked(at: serverNow) != true else { return }
+        ShieldController.applyStoredShields()
     }
 
     func keyHistory(for held: HeldKey) async -> KeyHistory? {
@@ -526,13 +585,20 @@ final class AppState: ObservableObject {
             if let requestID { await decideAppChange(requestID: requestID, approve: true) }
         case PushRegistrar.Action.denyApps:
             if let requestID { await decideAppChange(requestID: requestID, approve: false) }
+        case PushRegistrar.Action.approveAllowance:
+            if let requestID { await decideAllowance(requestID: requestID, approve: true) }
+        case PushRegistrar.Action.denyAllowance:
+            if let requestID { await decideAllowance(requestID: requestID, approve: false) }
         default:
             await refresh()
             // Tapping a request notification opens the decide sheet.
             let category = userInfo["category"] as? String
-            if category == PushRegistrar.unlockRequestCategory || category == PushRegistrar.appChangeRequestCategory,
+            let asksHolder = [PushRegistrar.unlockRequestCategory, PushRegistrar.appChangeRequestCategory,
+                              PushRegistrar.allowanceRequestCategory].contains(category ?? "")
+            if asksHolder,
                let held = snapshot?.held.first(where: {
                    $0.pendingRequest?.id == requestID || $0.pendingAppChange?.id == requestID
+                       || $0.pendingAllowance?.id == requestID
                }) {
                 openKey = held.id
             }

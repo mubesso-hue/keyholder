@@ -54,6 +54,8 @@ struct Block: Codable, Identifiable, Equatable {
     let allowedCount: Int?
     /// Minutes a day on chosen apps before they block. Optional for older rows.
     let allowanceMinutes: Int?
+    /// When the allowance was last changed, by either side.
+    let allowanceSetAt: Date?
 
     var isActive: Bool { status == .active }
 
@@ -153,6 +155,18 @@ struct Keyholder: Codable, Equatable {
     let profile: Profile
 }
 
+/// A locked person asking for a bigger daily allowance.
+struct AllowanceRequest: Codable, Identifiable, Equatable {
+    let id: UUID
+    let blockId: UUID
+    let requesterId: UUID
+    let holderId: UUID
+    let minutes: Int
+    let status: RequestStatus
+    let createdAt: Date
+    let decidedAt: Date?
+}
+
 /// One person whose key I hold.
 struct HeldKey: Codable, Identifiable, Equatable {
     let key: Key
@@ -162,6 +176,8 @@ struct HeldKey: Codable, Identifiable, Equatable {
     let pendingRequest: UnlockRequest?
     /// A pending request to open up apps, separate from any request for time.
     let pendingAppChange: UnlockRequest?
+    /// A pending request for a bigger daily allowance.
+    let pendingAllowance: AllowanceRequest?
     let requestsThisWeek: Int
 
     var id: UUID { key.id }
@@ -177,6 +193,8 @@ struct Snapshot: Codable, Equatable {
     let myPendingRequest: UnlockRequest?
     /// My latest app change for the current block, whatever its status.
     let myAppChange: UnlockRequest?
+    /// My pending request for a bigger daily allowance.
+    let myAllowanceRequest: AllowanceRequest?
     let held: [HeldKey]
 }
 
