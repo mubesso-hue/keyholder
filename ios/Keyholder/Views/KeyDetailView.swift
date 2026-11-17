@@ -13,6 +13,9 @@ struct KeyDetailView: View {
     @State private var confirmEnd = false
     @State private var confirmStop = false
     @State private var choosingAllowance = false
+    /// A short confirmation after an action, e.g. "Sarah has 30 min, until 15:42".
+    @State private var toast: String?
+    @State private var toastTask: Task<Void, Never>?
 
     private var held: HeldKey? { state.snapshot?.held.first { $0.id == keyID } }
 
@@ -61,6 +64,31 @@ struct KeyDetailView: View {
         .tint(.white)
         .preferredColorScheme(.dark)
         .renameAlert($renameTarget)
+        .overlay(alignment: .bottom) {
+            if let toast {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.orangeLight)
+                    Text(toast).font(.system(size: 15, weight: .medium))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .glass(cornerRadius: 24)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .accessibilityAddTraits(.isStaticText)
+            }
+        }
+        .animation(.spring(duration: 0.35), value: toast)
+        .sensoryFeedback(.success, trigger: toast) { _, new in new != nil }
+        .overlay {
+            if state.busy {
+                ProgressView().tint(.white).controlSize(.large)
+                    .padding(22)
+                    .glass(cornerRadius: 20)
+            }
+        }
         .sheet(isPresented: $showCustom) {
             if let held { customSheet(held) }
         }
@@ -503,12 +531,26 @@ struct KeyDetailView: View {
 
     /// Answers their request if there is one, otherwise gives time unasked.
     private func give(_ held: HeldKey, duration: UnlockDuration) {
+        let minutes = duration.minutes(now: state.serverNow)
         Task {
             if let request = held.pendingRequest {
                 await state.decide(request, decision: .approvedTimed, duration: duration)
             } else {
                 await state.holderUnlock(held, decision: .approvedTimed, duration: duration)
             }
+            guard state.errorMessage == nil else { return }
+            let until = state.serverNow.addingTimeInterval(TimeInterval(minutes * 60))
+            showToast("\(held.profile.displayName) has \(UnlockDuration.format(minutes: minutes)), until \(until.shortTime)")
+        }
+    }
+
+    private func showToast(_ text: String) {
+        toastTask?.cancel()
+        toast = text
+        toastTask = Task {
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard !Task.isCancelled else { return }
+            toast = nil
         }
     }
 
@@ -531,7 +573,8 @@ struct KeyDetailView: View {
     // MARK: History items
 
     struct Item: Identifiable {
-        let id = UUID()
+        /// Stable across refreshes, so rows don't flash as data reloads.
+        var id: String { "\(date.timeIntervalSince1970)|\(title)|\(outcome)" }
         let date: Date
         let title: String
         let outcome: String

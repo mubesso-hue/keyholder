@@ -1,5 +1,6 @@
 import Foundation
 import FamilyControls
+import DeviceActivity
 
 /// App Group storage shared by the app and its extensions. Everything the
 /// extensions need to act without the app running lives here.
@@ -208,6 +209,15 @@ enum SharedStore {
 
     static func note(_ event: String) {
         lastExtensionEvent = "\(ISO8601DateFormatter().string(from: Date())) \(event)"
+    }
+
+    /// When a one-off DeviceActivity window (unlock, Break Glass) is meant to end.
+    static func scheduledEnd(for name: DeviceActivityName) -> Date? {
+        defaults.object(forKey: "scheduledEnd.\(name.rawValue)") as? Date
+    }
+
+    static func setScheduledEnd(_ date: Date?, for name: DeviceActivityName) {
+        defaults.set(date, forKey: "scheduledEnd.\(name.rawValue)")
     }
 
     static func clearBlockState() {

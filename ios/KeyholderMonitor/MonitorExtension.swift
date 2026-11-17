@@ -48,6 +48,12 @@ final class MonitorExtension: DeviceActivityMonitor {
 
         switch activity {
         case .unlockWindow:
+            // A window being replaced or restarted is reported as ended too.
+            // Only act when the given time is really over.
+            if let until = SharedStore.unlockUntil, until.timeIntervalSinceNow > 60 {
+                SharedStore.note("unlockWindow restart ignored")
+                return
+            }
             SharedStore.unlockUntil = nil
             SharedStore.pendingShieldRequestAt = nil
             if SharedStore.blockActive {
@@ -56,6 +62,11 @@ final class MonitorExtension: DeviceActivityMonitor {
             postHeartbeat()
 
         case .breakGlass:
+            // Same for Break Glass: never lift the block before the wait is over.
+            guard let endsAt = SharedStore.breakGlassEndsAt, endsAt.timeIntervalSinceNow <= 60 else {
+                SharedStore.note("breakGlass restart ignored")
+                return
+            }
             ShieldController.clearEverything()
             SharedStore.clearBlockState()
             DeviceAPI.post(.breakGlassDone)

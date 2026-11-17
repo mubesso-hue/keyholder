@@ -121,9 +121,20 @@ enum ShieldController {
 enum MonitorScheduler {
     static let minimumInterval: TimeInterval = 15 * 60 + 30
 
+    /// Starts a one-off window that ends at `end`. Does nothing if that same
+    /// window is already running: iOS reports a restarted window as ended,
+    /// which made the extension put the shields back during time the
+    /// keyholder had given.
     static func schedule(_ name: DeviceActivityName, until end: Date) throws {
         let center = DeviceActivityCenter()
-        center.stopMonitoring([name])
+        if center.activities.contains(name),
+           let current = SharedStore.scheduledEnd(for: name),
+           abs(current.timeIntervalSince(end)) < 1 {
+            return
+        }
+        // The window is being replaced, not ending: tell the extension first.
+        SharedStore.setScheduledEnd(end, for: name)
+        if center.activities.contains(name) { center.stopMonitoring([name]) }
 
         let now = Date()
         let safeEnd = max(end, now.addingTimeInterval(minimumInterval))
@@ -137,8 +148,14 @@ enum MonitorScheduler {
         try center.startMonitoring(name, during: schedule)
     }
 
+    /// Stops the named activities that are running; others are left alone, so
+    /// calling this on every refresh doesn't trigger extension callbacks.
     static func cancel(_ names: DeviceActivityName...) {
-        DeviceActivityCenter().stopMonitoring(names)
+        let center = DeviceActivityCenter()
+        let running = names.filter { center.activities.contains($0) }
+        for name in names { SharedStore.setScheduledEnd(nil, for: name) }
+        guard !running.isEmpty else { return }
+        center.stopMonitoring(running)
     }
 
     /// Counts minutes on the allowance apps, every day from midnight. Restarting

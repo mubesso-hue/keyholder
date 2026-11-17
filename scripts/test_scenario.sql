@@ -228,6 +228,11 @@ select pg_temp.ok((select count(*) from public.events where block_id = :'sarah_b
 -- Heartbeat + revocation --------------------------------------------------------
 select public.heartbeat(true, true);
 select pg_temp.ok((select verified from public.blocks where id = :'sarah_block2'), 'verified after heartbeat');
+-- A second heartbeat right away writes nothing, so it can't set off a refresh loop.
+update public.blocks set last_heartbeat_at = now() - interval '1 minute' where id = :'sarah_block2';
+select last_heartbeat_at as hb_before from public.blocks where id = :'sarah_block2' \gset
+select public.heartbeat(true, true);
+select pg_temp.ok((select last_heartbeat_at = :'hb_before'::timestamptz from public.blocks where id = :'sarah_block2'), 'repeat heartbeat writes nothing');
 
 -- Cron flags a quiet phone once.
 update public.blocks set last_heartbeat_at = now() - interval '13 hours' where id = :'sarah_block2';

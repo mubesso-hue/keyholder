@@ -91,7 +91,7 @@ final class AppState: ObservableObject {
         await refresh()
         await registerDevice(apnsToken: nil)
         channel = await api.subscribeToChanges { [weak self] in
-            Task { @MainActor in await self?.refresh() }
+            Task { @MainActor in self?.refreshSoon() }
         }
         await PushRegistrar.requestPermissionAndRegister()
     }
@@ -209,6 +209,9 @@ final class AppState: ObservableObject {
         screenTime.refreshStatus()
         guard let block, block.isActive else { return }
         if screenTime.isAuthorized {
+            // Every few minutes is plenty; each one used to set off another refresh.
+            if let last = lastHeartbeatAt, Date().timeIntervalSince(last) < 5 * 60 { return }
+            lastHeartbeatAt = Date()
             try? await api.heartbeat(authorized: true, shielded: ShieldController.isShielding)
             return
         }
@@ -230,6 +233,18 @@ final class AppState: ObservableObject {
     }
 
     private var revocationCheckInFlight = false
+    private var lastHeartbeatAt: Date?
+    private var pendingRealtimeRefresh: Task<Void, Never>?
+
+    /// Realtime changes arrive in bursts; refresh once they settle.
+    private func refreshSoon() {
+        pendingRealtimeRefresh?.cancel()
+        pendingRealtimeRefresh = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.refresh()
+        }
+    }
 
     /// Keeps this phone's allowance in step with the server. A newer change on
     /// the server (the keyholder's setting, or an approval) is applied, counting
