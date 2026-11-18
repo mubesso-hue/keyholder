@@ -446,6 +446,38 @@ select pg_temp.ok(:tom_down = 30, 'locked person can turn it down');
 select pg_temp.assert_raises('select public.set_block_allowance(60)', 'only your keyholder');
 select pg_temp.as_user(:'marc');
 
+-- Time is a balance ------------------------------------------------------------------
+-- Tom is in the middle of an hour Marc gave him earlier. More time extends it.
+select extract(epoch from unlock_until)::int as until_before from public.blocks where id = :'tom_block' \gset
+select public.give_credit(:'tom', 30);
+select pg_temp.ok((select extract(epoch from unlock_until)::int - :until_before = 1800 from public.blocks where id = :'tom_block'), 'time given while using it extends it');
+select pg_temp.ok((select body = 'Added to the time you''re using now.' from public.notifications where category = 'CREDIT_GIVEN' order by id desc limit 1), 'told it was added');
+
+-- Locking again early keeps the rest.
+select pg_temp.as_user(:'tom');
+select credit_seconds as left1 from public.stop_credit() \gset
+select pg_temp.ok(:left1 between 5300 and 5400, 'locking again keeps what is left (about 90 min)');
+select pg_temp.ok((select unlock_until is null from public.blocks where id = :'tom_block'), 'apps lock again');
+select pg_temp.ok((select pause_started_at is null and pause_until is null from public.streaks where user_id = :'tom'), 'streak runs again');
+
+-- Using it opens the apps until the balance runs out.
+select extract(epoch from (unlock_until - now()))::int as session_len from public.use_credit() \gset
+select pg_temp.ok(:session_len = :left1, 'use my time opens the apps for the whole balance');
+select pg_temp.ok((select credit_seconds = 0 from public.blocks where id = :'tom_block'), 'balance is in use');
+select pg_temp.assert_raises('select public.use_credit()', 'already using time');
+select credit_seconds as left2 from public.stop_credit() \gset
+
+-- Time given while not using it goes into the balance, and answers a request.
+select id as tom_ask from public.request_unlock(30) \gset
+select pg_temp.as_user(:'marc');
+select credit_seconds as left3 from public.give_credit(:'tom', 20) \gset
+select pg_temp.ok(:left3 = :left2 + 1200, 'time given goes into the balance');
+select pg_temp.ok((select status = 'approved' and approved_minutes = 20 from public.unlock_requests where id = :'tom_ask'), 'it answers the request');
+select pg_temp.ok((select body like 'Use it whenever you like%' from public.notifications where category = 'CREDIT_GIVEN' order by id desc limit 1), 'told to use it whenever');
+select pg_temp.as_user(:'sarah');
+select pg_temp.assert_raises($$select public.give_credit('$$ || :'tom' || $$', 10)$$, 'do not hold an active block');
+select pg_temp.as_user(:'marc');
+
 -- Unauthenticated callers are rejected.
 select pg_temp.as_nobody();
 select pg_temp.assert_raises('select public.me_snapshot()', 'not authenticated');

@@ -137,15 +137,26 @@ enum MonitorScheduler {
         if center.activities.contains(name) { center.stopMonitoring([name]) }
 
         let now = Date()
-        let safeEnd = max(end, now.addingTimeInterval(minimumInterval))
         let calendar = Calendar.current
         let components: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
-        let schedule = DeviceActivitySchedule(
-            intervalStart: calendar.dateComponents(components, from: now),
-            intervalEnd: calendar.dateComponents(components, from: safeEnd),
-            repeats: false
-        )
-        try center.startMonitoring(name, during: schedule)
+        func window(_ start: Date, _ end: Date) -> DeviceActivitySchedule {
+            DeviceActivitySchedule(intervalStart: calendar.dateComponents(components, from: start),
+                                   intervalEnd: calendar.dateComponents(components, from: end),
+                                   repeats: false)
+        }
+        // iOS wants windows of at least 15 minutes, but a time balance can be
+        // shorter (10 minutes left over from earlier). Start the window in the
+        // past so it is long enough and still ends on time. If iOS refuses
+        // that, pad the end instead.
+        if end.timeIntervalSince(now) < minimumInterval {
+            do {
+                try center.startMonitoring(name, during: window(end.addingTimeInterval(-minimumInterval), end))
+                return
+            } catch {
+                SharedStore.note("short window refused, padding: \(error)")
+            }
+        }
+        try center.startMonitoring(name, during: window(now, max(end, now.addingTimeInterval(minimumInterval))))
     }
 
     /// Stops the named activities that are running; others are left alone, so

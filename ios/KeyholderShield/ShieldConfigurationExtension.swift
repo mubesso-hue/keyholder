@@ -20,6 +20,9 @@ final class ShieldConfigurationExtension: ShieldConfigurationDataSource {
             formatter.timeStyle = .short
             subtitle = "Break Glass ends \(formatter.string(from: until)). Until then, ask \(holder)."
             primary = recentlyAsked ? "Asked" : "Ask \(holder)"
+        } else if SharedStore.creditSeconds >= 60 {
+            subtitle = "You have \(SharedStore.creditSeconds / 60) min from \(holder). Open Keyholder and tap Use my time."
+            primary = recentlyAsked ? "Asked" : "Ask \(holder) for more"
         } else if recentlyAsked {
             subtitle = "You asked \(holder). Waiting for an answer."
             primary = "Asked"

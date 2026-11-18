@@ -36,6 +36,7 @@ enum PushRegistrar {
         static let deny = "DENY"
         static let approveApps = "APPROVE_APPS"
         static let denyApps = "DENY_APPS"
+        static let useCredit = "USE_CREDIT"
         static let approveAllowance = "APPROVE_ALLOWANCE"
         static let denyAllowance = "DENY_ALLOWANCE"
     }
@@ -71,7 +72,11 @@ enum PushRegistrar {
         let allowance = UNNotificationCategory(identifier: allowanceRequestCategory,
                                                actions: [approveAllowance, denyAllowance],
                                                intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([category, appChange, allowance])
+        let useNow = UNNotificationAction(identifier: Action.useCredit, title: "Use it now",
+                                          options: [.authenticationRequired])
+        let credit = UNNotificationCategory(identifier: "CREDIT_GIVEN", actions: [useNow],
+                                            intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category, appChange, allowance, credit])
     }
 
     static func requestPermissionAndRegister() async {

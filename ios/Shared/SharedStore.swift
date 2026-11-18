@@ -116,6 +116,12 @@ enum SharedStore {
         }
     }
 
+    /// Time given and not used yet, for the shield screen.
+    static var creditSeconds: Int {
+        get { defaults.integer(forKey: "creditSeconds") }
+        set { defaults.set(newValue, forKey: "creditSeconds") }
+    }
+
     /// When this phone last applied an allowance change, in server time. A
     /// change on the server that is newer (from the keyholder) replaces it.
     static var allowanceSetAt: Date? {
@@ -230,5 +236,6 @@ enum SharedStore {
         allowanceMinutes = 0
         allowanceExhaustedDay = nil
         allowanceSetAt = nil
+        creditSeconds = 0
     }
 }

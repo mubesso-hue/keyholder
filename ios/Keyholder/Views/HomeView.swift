@@ -151,7 +151,7 @@ struct HeroView: View {
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
                     headline(unlocked ? "Back in a moment." : "Phone down.\nLook up.")
-                    subline(unlocked ? "Unlocked until \(block.unlockUntil?.shortTime ?? "")." : "\(holderName) holds the key.")
+                    subline(unlocked ? usingLine(block, now: now) : "\(holderName) holds the key.")
                 }
 
                 if !block.verified {
@@ -174,7 +174,7 @@ struct HeroView: View {
                 allowanceStatus
                     .padding(.bottom, 4)
 
-                actions(block)
+                actions(block, unlocked: unlocked)
                     .padding(.top, 18)
 
                 RecordStat(seconds: max(snapshot.streak.bestSeconds, seconds))
@@ -206,23 +206,49 @@ struct HeroView: View {
         .glass()
     }
 
-    /// Ask for time, and Break Glass in plain sight. Change apps sits underneath as a link.
-    private func actions(_ block: Block) -> some View {
+    /// "24 min left · locks at 15:42".
+    private func usingLine(_ block: Block, now: Date) -> String {
+        guard let until = block.unlockUntil else { return "" }
+        let left = Int(max(0, until.timeIntervalSince(now)))
+        return "\(UnlockDuration.format(seconds: left)) left · locks at \(until.shortTime)."
+    }
+
+    /// While using time: Lock again. Otherwise: use the time you have, ask for
+    /// more, and Break Glass in plain sight. Change apps sits underneath as a link.
+    private func actions(_ block: Block, unlocked: Bool) -> some View {
         VStack(spacing: 10) {
-            if let pending = snapshot.myPendingRequest {
+            if unlocked {
+                Button("Lock again now") { Task { await state.stopCredit() } }
+                    .buttonStyle(GlassPillStyle(fullWidth: true))
+                    .disabled(state.busy)
+                Text("What's left stays yours for later.")
+                    .font(Theme.helper)
+                    .foregroundStyle(Theme.white60)
+                    .legibleOnPhoto()
+            } else if block.credit > 0 {
+                Button("Use my time · \(UnlockDuration.format(seconds: block.credit))") {
+                    Task { await state.useCredit() }
+                }
+                .buttonStyle(OrangePillStyle())
+                .disabled(state.busy)
+            }
+
+            if unlocked {
+                EmptyView()
+            } else if let pending = snapshot.myPendingRequest {
                 Text(pending.requestedMinutes.map { "Asked \(holderName) for \(UnlockDuration.format(minutes: $0)). Waiting…" } ?? "Asked \(holderName). Waiting…")
                     .font(.system(size: 15))
                     .foregroundStyle(Theme.white60)
                     .padding(.vertical, 12)
                     .legibleOnPhoto()
             } else {
-                Button("Ask \(holderName) for time") { state.sheet = .request }
+                Button(block.credit > 0 ? "Ask \(holderName) for more" : "Ask \(holderName) for time") { state.sheet = .request }
                     .buttonStyle(GlassPillStyle(fullWidth: true))
                     .disabled(state.busy)
             }
 
             // While Break Glass runs, the panel above shows the countdown and Cancel instead.
-            if block.breakGlassEndsAt == nil {
+            if block.breakGlassEndsAt == nil && !unlocked {
                 Button("Break Glass") { state.sheet = .breakGlass }
                     .buttonStyle(BreakGlassPillStyle(fullWidth: true))
                     .disabled(state.busy)
@@ -477,7 +503,7 @@ struct HeldKeyRow: View {
     private func status(now: Date) -> some View {
         if let block = held.block, block.isActive {
             if block.isTemporarilyUnlocked(at: now), let until = block.unlockUntil {
-                Text("Unlocked until \(until.shortTime)")
+                Text("Using time · until \(until.shortTime)")
                     .font(.system(size: 12)).foregroundStyle(Theme.white60)
             } else {
                 HStack(spacing: 6) {
@@ -493,6 +519,9 @@ struct HeldKeyRow: View {
 
     private func metaLine(_ block: Block, now: Date) -> String {
         var parts = [block.summary, "\(held.requestsThisWeek) requests this week"]
+        if block.credit >= 60 {
+            parts.append("\(UnlockDuration.format(seconds: block.credit)) to use")
+        }
         if let endsAt = block.breakGlassEndsAt {
             parts.append("Broke the glass, ends in \(StreakState.format(max(0, endsAt.timeIntervalSince(now))))")
         }

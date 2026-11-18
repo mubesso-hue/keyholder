@@ -56,6 +56,10 @@ struct Block: Codable, Identifiable, Equatable {
     let allowanceMinutes: Int?
     /// When the allowance was last changed, by either side.
     let allowanceSetAt: Date?
+    /// Time given by the keyholder and not used yet. "Use my time" spends it.
+    let creditSeconds: Int?
+
+    var credit: Int { creditSeconds ?? 0 }
 
     var isActive: Bool { status == .active }
 
@@ -274,14 +278,21 @@ enum UnlockDuration: Hashable, Identifiable {
         }
     }
 
-    static let presets: [UnlockDuration] = [.minutes(15), .minutes(30), .minutes(60), .restOfDay]
+    static let presets: [UnlockDuration] = [.minutes(15), .minutes(30), .minutes(60), .minutes(120)]
 
     var label: String {
         switch self {
-        case .minutes(let m): return m >= 60 ? "\(m / 60) hour" : "\(m) min"
+        case .minutes(let m):
+            if m >= 60 && m % 60 == 0 { return "\(m / 60) hour\(m >= 120 ? "s" : "")" }
+            return Self.format(minutes: m)
         case .restOfDay: return "Rest of today"
         case .custom(let m): return Self.format(minutes: m)
         }
+    }
+
+    /// A balance in seconds: "29 min", "1 h 5 min", or "under a minute".
+    static func format(seconds: Int) -> String {
+        seconds < 60 ? "under a minute" : format(minutes: seconds / 60)
     }
 
     /// "45 min", "2 h", "1 h 20 min".

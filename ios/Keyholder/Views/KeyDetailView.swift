@@ -172,7 +172,7 @@ struct KeyDetailView: View {
                 return ("Not locked", AnyShapeStyle(Theme.white40))
             }
             if let until = block.unlockUntil, until > now {
-                return ("Unlocked until \(until.shortTime)", AnyShapeStyle(Theme.white60))
+                return ("Using their time · until \(until.shortTime)", AnyShapeStyle(Theme.white60))
             }
             let checked = RelativeDateTimeFormatter().localizedString(for: block.lastHeartbeatAt, relativeTo: now)
             if !block.verified {
@@ -335,9 +335,7 @@ struct KeyDetailView: View {
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
                 TrackedLabel(text: "GIVE TIME")
-                Text(unlocked
-                     ? "Unlocked until \(block.unlockUntil?.shortTime ?? ""). Giving time now starts a new window from now."
-                     : "\(held.profile.displayName) hasn't asked. You can still give time: their streak pauses while they're unlocked and carries on after.")
+                Text(giveCardText(held, block: block, unlocked: unlocked))
                     .font(.system(size: 14))
                     .foregroundStyle(Theme.white60)
                     .fixedSize(horizontal: false, vertical: true)
@@ -356,6 +354,15 @@ struct KeyDetailView: View {
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glass(cornerRadius: 22)
+    }
+
+    private func giveCardText(_ held: HeldKey, block: Block, unlocked: Bool) -> String {
+        let name = held.profile.displayName
+        if unlocked {
+            return "\(name) is using their time until \(block.unlockUntil?.shortTime ?? ""). Anything you give now is added to it."
+        }
+        let balance = block.credit >= 60 ? " They have \(UnlockDuration.format(seconds: block.credit)) left to use." : ""
+        return "\(name) hasn't asked. Time you give goes into their balance, and they use it when they like.\(balance)"
     }
 
     // MARK: Their block and the week
@@ -389,6 +396,8 @@ struct KeyDetailView: View {
                 Text("Minutes a day on the apps they chose. It counts what they've already used today, and they're told right away.")
             }
             rowDivider
+            infoRow("Time to use", block.credit > 0 ? UnlockDuration.format(seconds: block.credit) : "None")
+            rowDivider
             infoRow("Break Glass wait", "\(block.coolingOffHours) hours")
             rowDivider
             infoRow("Pact", mutual ? "Mutual: they hold your key too" : "You hold their key")
@@ -412,7 +421,7 @@ struct KeyDetailView: View {
                 HStack(alignment: .top) {
                     weekStat("\(history.requests)", history.requests == 1 ? "request" : "requests")
                     weekStat("\(history.given)", "given")
-                    weekStat(history.unlockedMinutes > 0 ? UnlockDuration.format(minutes: history.unlockedMinutes) : "0", "unlocked")
+                    weekStat(history.unlockedMinutes > 0 ? UnlockDuration.format(minutes: history.unlockedMinutes) : "0", "time given")
                 }
                 .padding(.vertical, 14)
                 let items = Self.items(from: history, name: held.profile.displayName)
@@ -511,7 +520,7 @@ struct KeyDetailView: View {
                         give(held, minutes: minutes)
                     }
                 } footer: {
-                    Text("From 15 minutes to 24 hours. The block comes back on its own.")
+                    Text("From 15 minutes to 24 hours. It goes into their balance.")
                 }
             }
             .navigationTitle("Give \(held.profile.displayName) time")
@@ -530,8 +539,11 @@ struct KeyDetailView: View {
     }
 
     /// Answers their request if there is one, otherwise gives time unasked.
+    /// Either way it goes into their balance, or into the time they're using now.
     private func give(_ held: HeldKey, duration: UnlockDuration) {
         let minutes = duration.minutes(now: state.serverNow)
+        let running = held.block?.isTemporarilyUnlocked(at: state.serverNow) == true
+        let name = held.profile.displayName
         Task {
             if let request = held.pendingRequest {
                 await state.decide(request, decision: .approvedTimed, duration: duration)
@@ -539,8 +551,13 @@ struct KeyDetailView: View {
                 await state.holderUnlock(held, decision: .approvedTimed, duration: duration)
             }
             guard state.errorMessage == nil else { return }
-            let until = state.serverNow.addingTimeInterval(TimeInterval(minutes * 60))
-            showToast("\(held.profile.displayName) has \(UnlockDuration.format(minutes: minutes)), until \(until.shortTime)")
+            let given = UnlockDuration.format(minutes: minutes)
+            if running {
+                showToast("Added \(given) to the time \(name) is using")
+            } else {
+                let balance = state.snapshot?.held.first { $0.profile.id == held.profile.id }?.block?.credit ?? minutes * 60
+                showToast("\(name) now has \(UnlockDuration.format(seconds: balance)) to use")
+            }
         }
     }
 

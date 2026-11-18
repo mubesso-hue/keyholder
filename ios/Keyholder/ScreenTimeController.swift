@@ -73,6 +73,7 @@ final class ScreenTimeController: ObservableObject {
 
         SharedStore.blockID = block.id.uuidString
         SharedStore.blockActive = true
+        SharedStore.creditSeconds = block.credit
 
         if let until = block.unlockUntil, until > now {
             ShieldController.liftShieldsKeepingRemovalDenied()

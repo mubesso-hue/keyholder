@@ -37,7 +37,7 @@ struct RequestUnlockSheet: View {
                 } header: {
                     Text("How long?")
                 } footer: {
-                    Text("This is a suggestion. \(holder) picks the actual duration, and the block comes back on its own when it ends.")
+                    Text("\(holder) decides how much. It goes into your time, and you use it whenever you like.")
                 }
             }
             .navigationTitle("Ask \(holder)")
@@ -104,7 +104,7 @@ struct DecideRequestSheet: View {
                     }
                 }
 
-                Section("Give time") {
+                Section {
                     ForEach(UnlockDuration.presets) { duration in
                         Button(duration.label) {
                             Task {
@@ -123,6 +123,10 @@ struct DecideRequestSheet: View {
                             dismiss()
                         }
                     }
+                } header: {
+                    Text("Give time")
+                } footer: {
+                    Text("It goes into \(held.profile.displayName)'s balance. They use it when they like, in one go or a bit at a time.")
                 }
 
                 Section {

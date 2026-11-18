@@ -223,6 +223,29 @@ final class SupabaseService {
         try await client.rpc("set_block_allowance", params: ["p_minutes": minutes]).execute().value
     }
 
+    // MARK: Time balance (migration 0012)
+
+    private struct GiveCreditParams: Encodable {
+        let pLockedId: String
+        let pMinutes: Int
+    }
+
+    /// The keyholder gives time: it goes into the locked person's balance.
+    func giveCredit(lockedID: UUID, minutes: Int) async throws -> Block {
+        try await client.rpc("give_credit", params: GiveCreditParams(
+            pLockedId: lockedID.uuidString, pMinutes: minutes)).execute().value
+    }
+
+    /// The locked person starts using their balance.
+    func useCredit() async throws -> Block {
+        try await client.rpc("use_credit").execute().value
+    }
+
+    /// The locked person locks again; what's left stays in the balance.
+    func stopCredit() async throws -> Block {
+        try await client.rpc("stop_credit").execute().value
+    }
+
     // MARK: Allowance control (migration 0010)
 
     private struct HolderAllowanceParams: Encodable {

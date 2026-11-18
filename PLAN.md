@@ -27,10 +27,14 @@ Decisions already made:
 1. Locked person taps a blocked app. The shield says "Blocked. Ask Sarah." with a
    **Request unlock** button. Or they open the app and tap Request.
 2. Keyholder gets a push with quick actions: 15 min, 1 hour, deny. Or opens the
-   app and picks 15 / 30 / 60 min, rest of today, or end the block.
-3. On approval the locked phone drops its shields for exactly that window and the
-   streak pauses. When the window ends, shields return on their own. The locked
-   person cannot extend; they ask again.
+   app and picks 15 / 30 / 60 min, 2 hours, a custom amount, or ends the block.
+   They can also give time without being asked.
+3. Time given is a **balance**, not a window. 30 minutes given at 3 pm is 30
+   minutes to spend: 15 at 3 pm and 15 at 5 pm, say. The locked person taps
+   **Use my time**; shields drop and the balance counts down while the streak
+   pauses. **Lock again** stops the clock and keeps what's left. When the balance
+   runs out, shields return on their own. Time given while they're using it is
+   added to the running clock. To get more they ask again.
 
 ## 3. Rules
 
@@ -53,8 +57,15 @@ Decisions already made:
 - A change mid-day keeps the minutes already used today.
 - A keyholder may resign only when the person they guard has no active block.
 
+**Time balance**
+- Screen Time can't count minutes inside "everything except" blocks, so the clock
+  runs while the person has their apps open, which they start and stop.
+- The balance belongs to the block: it's gone when the block ends.
+- Builds before 6 use `holder_unlock` / `decide_unlock` and still open a window
+  straight away; the locked person can then Lock again to bank the rest.
+
 **Streak** (continuous time with a live block)
-- Approved timed unlocks **pause** the clock. Unlocked minutes are subtracted.
+- Time spent using the balance **pauses** the clock. Those minutes are subtracted.
 - *End block* by keyholder, Break Glass completion, and detected revocation
   **reset** to zero. The record is kept.
 - A missed heartbeat marks the streak *unverified*, not broken. On next launch
@@ -102,7 +113,8 @@ iPhone (keyholder) ◀───────────────────�
   `store.application.denyAppRemoval = true`. Selection persisted in the App Group.
 - Temporary unlock: clear shields, start a `DeviceActivity` schedule ending at
   `unlock_until`. The monitor extension's `intervalDidEnd` re-applies shields even
-  if the app is dead. Minimum schedule length is 15 min, so 15 min is the shortest unlock.
+  if the app is dead. iOS wants schedules of at least 15 min, so a shorter balance
+  starts its schedule in the past so it still ends on time (padded only if iOS refuses).
 - Break Glass: same mechanism with a schedule ending at `break_glass_ends_at`;
   `intervalDidEnd` clears everything. Server cron completes it independently.
 - Heartbeat: on foreground, on background refresh, and from the monitor extension,
@@ -130,6 +142,7 @@ server's `blocks` row on every launch, push, realtime change, and extension call
 All client writes go through `security definer` RPCs so invariants hold:
 `create_invite`, `get_invite`, `accept_invite`, `start_block`, `request_unlock`, `decide_unlock`,
 `holder_unlock` (keyholder gives time unasked, e.g. to cut a Break Glass wait short),
+`give_credit`, `use_credit`, `stop_credit` (the time balance, migration 0012),
 `start_break_glass`, `cancel_break_glass`, `complete_break_glass`, `report_revocation`, `end_key`,
 `lengthen_cooling_off`, `heartbeat`, `register_device`, `update_display_name`, `me_snapshot`,
 plus `device_event` (service role) and `cron_tick`.
@@ -141,8 +154,8 @@ plus `device_event` (service role) and `cron_tick`.
 3. **Home** — your card (status, streak, record, Lock / Request / Break Glass) and
    a "Keys you hold" list, each with streak, record, pending request, break-glass countdown.
 4. **Lock flow** — pick apps (Apple's picker) → choose cooling-off → confirm.
-5. **Request unlock** sheet — 15 / 30 / 60 min, rest of today.
-6. **Decide** sheet (keyholder) — 15 / 30 / 60 min, rest of today, end block, deny.
+5. **Request unlock** sheet — 15 / 30 / 60 min, 2 hours, custom.
+6. **Decide** sheet (keyholder) — 15 / 30 / 60 min, 2 hours, custom, end block, deny.
 7. **Break Glass** — warning screen; countdown with Cancel while pending.
 8. **Invite** — choose mode, share link / code. **Accept** — paste code.
 9. **Settings** — name, cooling-off (lengthen only), resign a key, sign out.

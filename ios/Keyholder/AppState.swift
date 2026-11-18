@@ -434,19 +434,47 @@ final class AppState: ObservableObject {
         await run { _ = try await self.api.requestUnlock(minutes: duration.minutes(now: self.serverNow)) }
     }
 
+    /// Keyholder answers a request. Giving time adds it to their balance;
+    /// saying no and ending the block work as before.
     func decide(_ request: UnlockRequest, decision: RequestDecision, duration: UnlockDuration? = nil) async {
         let minutes = duration?.minutes(now: serverNow)
+        if decision == .approvedTimed, let minutes {
+            await run { _ = try await self.api.giveCredit(lockedID: request.requesterId, minutes: minutes) }
+            return
+        }
         await run { _ = try await self.api.decideUnlock(requestID: request.id, decision: decision, minutes: minutes) }
     }
 
+    /// From a notification's quick action.
     func decide(requestID: UUID, decision: RequestDecision, minutes: Int?) async {
+        if decision == .approvedTimed, let minutes {
+            if snapshot?.held.contains(where: { $0.pendingRequest?.id == requestID }) != true { await refresh() }
+            if let requester = snapshot?.held.first(where: { $0.pendingRequest?.id == requestID })?.profile.id {
+                await run { _ = try await self.api.giveCredit(lockedID: requester, minutes: minutes) }
+                return
+            }
+        }
         await run { _ = try await self.api.decideUnlock(requestID: requestID, decision: decision, minutes: minutes) }
     }
 
-    /// Keyholder acts without a request (e.g. to cut a Break Glass wait short).
+    /// Keyholder acts without a request: gives time, or ends the block.
     func holderUnlock(_ held: HeldKey, decision: RequestDecision, duration: UnlockDuration? = nil) async {
         let minutes = duration?.minutes(now: serverNow)
+        if decision == .approvedTimed, let minutes {
+            await run { _ = try await self.api.giveCredit(lockedID: held.profile.id, minutes: minutes) }
+            return
+        }
         await run { _ = try await self.api.holderUnlock(lockedID: held.profile.id, decision: decision, minutes: minutes) }
+    }
+
+    /// The locked person starts using the time they were given.
+    func useCredit() async {
+        await run { _ = try await self.api.useCredit() }
+    }
+
+    /// The locked person locks again early; the rest stays theirs.
+    func stopCredit() async {
+        await run { _ = try await self.api.stopCredit() }
     }
 
     // MARK: Changing apps while locked
@@ -600,6 +628,8 @@ final class AppState: ObservableObject {
             if let requestID { await decideAppChange(requestID: requestID, approve: true) }
         case PushRegistrar.Action.denyApps:
             if let requestID { await decideAppChange(requestID: requestID, approve: false) }
+        case PushRegistrar.Action.useCredit:
+            await useCredit()
         case PushRegistrar.Action.approveAllowance:
             if let requestID { await decideAllowance(requestID: requestID, approve: true) }
         case PushRegistrar.Action.denyAllowance:
