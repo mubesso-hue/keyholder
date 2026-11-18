@@ -33,6 +33,10 @@ final class MonitorExtension: DeviceActivityMonitor {
             SharedStore.note("allowance used up")
             SharedStore.allowanceExhaustedDay = SharedStore.today
             SharedStore.setAllowanceUsed(SharedStore.allowanceMinutes)
+            // During given time the allowance apps now count against it too.
+            if SharedStore.isOpenForGivenTime, !MonitorScheduler.ensureCreditCounting() {
+                SharedStore.note("credit recount failed")
+            }
             reapplyShieldsIfLocked()
         } else if let minutes = event.allowanceUsedMinutes {
             SharedStore.setAllowanceUsed(max(SharedStore.allowanceUsedToday, minutes))
