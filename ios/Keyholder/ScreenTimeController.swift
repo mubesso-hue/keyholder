@@ -66,7 +66,7 @@ final class ScreenTimeController: ObservableObject {
 
         guard let block, block.isActive else {
             ShieldController.clearEverything()
-            MonitorScheduler.cancel(.unlockWindow, .breakGlass, .allowance, .allowanceToday)
+            MonitorScheduler.cancel(.unlockWindow, .breakGlass, .allowance, .allowanceToday, .credit)
             SharedStore.clearBlockState()
             return
         }
@@ -74,6 +74,10 @@ final class ScreenTimeController: ObservableObject {
         SharedStore.blockID = block.id.uuidString
         SharedStore.blockActive = true
         SharedStore.creditSeconds = block.credit
+        syncCredit(block)
+        // Given time on picked apps: open while Screen Time counts it. If it
+        // can't count, the apps stay blocked rather than open uncounted.
+        let counting = MonitorScheduler.ensureCreditCounting()
 
         if let until = block.unlockUntil, until > now {
             ShieldController.liftShieldsKeepingRemovalDenied()
@@ -82,8 +86,13 @@ final class ScreenTimeController: ObservableObject {
             try? MonitorScheduler.schedule(.unlockWindow, until: until)
         } else {
             SharedStore.unlockUntil = nil
-            ShieldController.applyStoredShields()
             MonitorScheduler.cancel(.unlockWindow)
+            if counting {
+                ShieldController.liftShieldsKeepingRemovalDenied()
+                SharedStore.pendingShieldRequestAt = nil
+            } else {
+                ShieldController.applyStoredShields()
+            }
         }
 
         if let endsAt = block.breakGlassEndsAt {
@@ -96,5 +105,27 @@ final class ScreenTimeController: ObservableObject {
 
         MonitorScheduler.ensureDailyHeartbeat()
         MonitorScheduler.ensureAllowance()
+    }
+
+    /// Takes the server's figures for given time. Used time only grows, so
+    /// minutes counted here and not yet reported are kept.
+    private func syncCredit(_ block: Block) {
+        if SharedStore.creditBlockID != block.id.uuidString {
+            MonitorScheduler.stopCreditCounting()
+            SharedStore.creditBlockID = block.id.uuidString
+            SharedStore.creditUsedSeconds = 0
+            SharedStore.creditReportedSeconds = 0
+        }
+        let used = block.usedCredit
+        SharedStore.noteCreditUsed(used)
+        SharedStore.creditReportedSeconds = max(SharedStore.creditReportedSeconds, used)
+        SharedStore.creditTotalSeconds = block.isAllExcept ? 0 : used + block.credit
+    }
+
+    /// Used seconds counted on this phone that the server hasn't heard yet.
+    func unreportedCreditUse(for block: Block) -> Int? {
+        guard block.isActive, !block.isAllExcept, SharedStore.creditBlockID == block.id.uuidString else { return nil }
+        let used = SharedStore.creditUsedSeconds
+        return used > max(SharedStore.creditReportedSeconds, block.usedCredit) ? used : nil
     }
 }

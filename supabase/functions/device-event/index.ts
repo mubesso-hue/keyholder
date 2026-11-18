@@ -1,7 +1,7 @@
 // device-event: entry point for the iOS extensions, which have no user JWT.
 // They authenticate with the per-device secret issued by register_device().
 //
-// POST { secret: string, type: "heartbeat" | "request_unlock" | "revoked" | "break_glass_done", payload?: object }
+// POST { secret: string, type: "heartbeat" | "request_unlock" | "revoked" | "break_glass_done" | "credit_used", payload?: object }
 //
 // Deploy with JWT verification off (see supabase/config.toml); the device
 // secret is the credential here.
@@ -14,7 +14,7 @@ const json = (body: unknown, status = 200) =>
     headers: { "content-type": "application/json" },
   });
 
-const ALLOWED = new Set(["heartbeat", "request_unlock", "revoked", "break_glass_done"]);
+const ALLOWED = new Set(["heartbeat", "request_unlock", "revoked", "break_glass_done", "credit_used"]);
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405);

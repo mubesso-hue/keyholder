@@ -56,10 +56,15 @@ struct Block: Codable, Identifiable, Equatable {
     let allowanceMinutes: Int?
     /// When the allowance was last changed, by either side.
     let allowanceSetAt: Date?
-    /// Time given by the keyholder and not used yet. "Use my time" spends it.
+    /// Time given by the keyholder and not used yet. On picked apps it goes
+    /// down as Screen Time counts use; on everything-except it's what was
+    /// saved with Lock again.
     let creditSeconds: Int?
+    /// Given time used on picked apps, as reported by the locked phone.
+    let creditUsedSeconds: Int?
 
     var credit: Int { creditSeconds ?? 0 }
+    var usedCredit: Int { creditUsedSeconds ?? 0 }
 
     var isActive: Bool { status == .active }
 

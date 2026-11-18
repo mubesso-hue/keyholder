@@ -124,6 +124,7 @@ final class AppState: ObservableObject {
             settleAllowance(snap)
             screenTime.reconcile(block: snap.block, holderName: snap.keyholder?.profile.displayName, now: serverNow)
             scheduleLocalTimers(for: snap.block)
+            await reportCreditUse(block: snap.block)
             await checkAuthorizationAndHeartbeat(block: snap.block)
         } catch let error where error.isCancellation {
             return
@@ -418,7 +419,16 @@ final class AppState: ObservableObject {
     private func reapplyShieldsUnlessUnlocked() {
         guard snapshot?.block?.isActive == true,
               snapshot?.block?.isTemporarilyUnlocked(at: serverNow) != true else { return }
-        ShieldController.applyStoredShields()
+        ShieldController.applyStoredShieldsUnlessOpen()
+    }
+
+    /// Tells the server about given time Screen Time counted while the
+    /// extension couldn't report it. Quiet: it's retried on the next refresh.
+    private func reportCreditUse(block: Block?) async {
+        guard let block, let used = screenTime.unreportedCreditUse(for: block) else { return }
+        if (try? await api.reportCreditUsed(blockID: block.id, usedSeconds: used)) != nil {
+            SharedStore.creditReportedSeconds = max(SharedStore.creditReportedSeconds, used)
+        }
     }
 
     func keyHistory(for held: HeldKey) async -> KeyHistory? {
@@ -511,7 +521,7 @@ final class AppState: ObservableObject {
             if plan.tightensAnything {
                 screenTime.setSelection(plan.immediate, for: mode)
                 if !block.isTemporarilyUnlocked(at: serverNow) {
-                    ShieldController.applyStoredShields()
+                    ShieldController.applyStoredShieldsUnlessOpen()
                 }
                 let size = AppChangePlan.blockSize(plan.immediate, mode: mode)
                 _ = try await api.updateBlockApps(appCount: size.appCount, categoryCount: size.categoryCount,
@@ -628,8 +638,6 @@ final class AppState: ObservableObject {
             if let requestID { await decideAppChange(requestID: requestID, approve: true) }
         case PushRegistrar.Action.denyApps:
             if let requestID { await decideAppChange(requestID: requestID, approve: false) }
-        case PushRegistrar.Action.useCredit:
-            await useCredit()
         case PushRegistrar.Action.approveAllowance:
             if let requestID { await decideAllowance(requestID: requestID, approve: true) }
         case PushRegistrar.Action.denyAllowance:

@@ -174,6 +174,10 @@ struct KeyDetailView: View {
             if let until = block.unlockUntil, until > now {
                 return ("Using their time · until \(until.shortTime)", AnyShapeStyle(Theme.white60))
             }
+            if !block.isAllExcept && block.credit > 0 {
+                return ("Apps open · \(UnlockDuration.format(seconds: block.credit)) left, counted while used",
+                        AnyShapeStyle(Theme.white60))
+            }
             let checked = RelativeDateTimeFormatter().localizedString(for: block.lastHeartbeatAt, relativeTo: now)
             if !block.verified {
                 return ("Locked · phone quiet, last checked in \(checked)", AnyShapeStyle(Theme.orangeLight))
@@ -358,11 +362,15 @@ struct KeyDetailView: View {
 
     private func giveCardText(_ held: HeldKey, block: Block, unlocked: Bool) -> String {
         let name = held.profile.displayName
+        if !block.isAllExcept {
+            let left = block.credit >= 60 ? " They have \(UnlockDuration.format(seconds: block.credit)) left." : ""
+            return "Their apps open as soon as you give time, and it only counts down while they're using them.\(left)"
+        }
         if unlocked {
             return "\(name) is using their time until \(block.unlockUntil?.shortTime ?? ""). Anything you give now is added to it."
         }
-        let balance = block.credit >= 60 ? " They have \(UnlockDuration.format(seconds: block.credit)) left to use." : ""
-        return "\(name) hasn't asked. Time you give goes into their balance, and they use it when they like.\(balance)"
+        let saved = block.credit >= 60 ? " They've saved \(UnlockDuration.format(seconds: block.credit)), which starts with it." : ""
+        return "Their apps open as soon as you give time. The clock runs until they lock again, and what's left stays theirs.\(saved)"
     }
 
     // MARK: Their block and the week
@@ -396,7 +404,8 @@ struct KeyDetailView: View {
                 Text("Minutes a day on the apps they chose. It counts what they've already used today, and they're told right away.")
             }
             rowDivider
-            infoRow("Time to use", block.credit > 0 ? UnlockDuration.format(seconds: block.credit) : "None")
+            infoRow(block.isAllExcept ? "Time saved" : "Time left to use",
+                    block.credit > 0 ? UnlockDuration.format(seconds: block.credit) : "None")
             rowDivider
             infoRow("Break Glass wait", "\(block.coolingOffHours) hours")
             rowDivider
@@ -520,7 +529,7 @@ struct KeyDetailView: View {
                         give(held, minutes: minutes)
                     }
                 } footer: {
-                    Text("From 15 minutes to 24 hours. It goes into their balance.")
+                    Text("From 15 minutes to 24 hours. Their apps open right away.")
                 }
             }
             .navigationTitle("Give \(held.profile.displayName) time")
@@ -539,7 +548,7 @@ struct KeyDetailView: View {
     }
 
     /// Answers their request if there is one, otherwise gives time unasked.
-    /// Either way it goes into their balance, or into the time they're using now.
+    /// Either way their apps open right away (or the running clock gets longer).
     private func give(_ held: HeldKey, duration: UnlockDuration) {
         let minutes = duration.minutes(now: state.serverNow)
         let running = held.block?.isTemporarilyUnlocked(at: state.serverNow) == true
@@ -552,11 +561,18 @@ struct KeyDetailView: View {
             }
             guard state.errorMessage == nil else { return }
             let given = UnlockDuration.format(minutes: minutes)
-            if running {
-                showToast("Added \(given) to the time \(name) is using")
+            let after = state.snapshot?.held.first { $0.profile.id == held.profile.id }?.block
+            if held.block?.isAllExcept == true {
+                if running {
+                    showToast("Added \(given) to the time \(name) is using")
+                } else if let until = after?.unlockUntil {
+                    showToast("\(name)'s apps are open until \(until.shortTime)")
+                } else {
+                    showToast("Gave \(name) \(given)")
+                }
             } else {
-                let balance = state.snapshot?.held.first { $0.profile.id == held.profile.id }?.block?.credit ?? minutes * 60
-                showToast("\(name) now has \(UnlockDuration.format(seconds: balance)) to use")
+                let left = after?.credit ?? minutes * 60
+                showToast("\(name)'s apps are open · \(UnlockDuration.format(seconds: left)) to use")
             }
         }
     }

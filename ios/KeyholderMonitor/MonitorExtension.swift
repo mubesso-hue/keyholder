@@ -24,6 +24,10 @@ final class MonitorExtension: DeviceActivityMonitor {
 
     override func eventDidReachThreshold(_ event: DeviceActivityEvent.Name, activity: DeviceActivityName) {
         super.eventDidReachThreshold(event, activity: activity)
+        if activity == .credit, let used = event.creditUsedSeconds {
+            creditMark(used)
+            return
+        }
         guard activity == .allowance || activity == .allowanceToday else { return }
         if event == .allowanceDone {
             SharedStore.note("allowance used up")
@@ -38,8 +42,30 @@ final class MonitorExtension: DeviceActivityMonitor {
     /// Shields follow the allowance, except during time the keyholder gave.
     private func reapplyShieldsIfLocked() {
         guard SharedStore.blockActive else { return }
-        if let until = SharedStore.unlockUntil, until > Date() { return }
-        ShieldController.applyStoredShields()
+        ShieldController.applyStoredShieldsUnlessOpen()
+    }
+
+    /// Screen Time counted more of the given time. When it's used up the
+    /// shields come back. The server hears every 5 minutes and at the end.
+    private func creditMark(_ used: Int) {
+        guard SharedStore.blockActive else { return }
+        SharedStore.noteCreditUsed(used)
+        if SharedStore.creditLeftSeconds <= 0 {
+            SharedStore.note("given time used up")
+            MonitorScheduler.stopCreditCounting()
+            ShieldController.applyStoredShieldsUnlessOpen()
+            reportCredit()
+        } else if SharedStore.creditUsedSeconds - SharedStore.creditReportedSeconds >= 300 {
+            reportCredit()
+        }
+    }
+
+    private func reportCredit() {
+        let used = SharedStore.creditUsedSeconds
+        guard let blockID = SharedStore.blockID, used > SharedStore.creditReportedSeconds else { return }
+        DeviceAPI.post(.creditUsed, payload: ["block_id": blockID, "used_seconds": used]) { ok in
+            if ok { SharedStore.creditReportedSeconds = max(SharedStore.creditReportedSeconds, used) }
+        }
     }
 
     override func intervalDidEnd(for activity: DeviceActivityName) {
@@ -57,9 +83,26 @@ final class MonitorExtension: DeviceActivityMonitor {
             SharedStore.unlockUntil = nil
             SharedStore.pendingShieldRequestAt = nil
             if SharedStore.blockActive {
-                ShieldController.applyStoredShields()
+                ShieldController.applyStoredShieldsUnlessOpen()
             }
             postHeartbeat()
+
+        case .credit:
+            // Restarts and stops are reported as ends too. A stop clears the
+            // end first; a restart moves it later.
+            guard let end = SharedStore.scheduledEnd(for: .credit) else { return }
+            if end.timeIntervalSinceNow > 60 {
+                SharedStore.note("credit restart ignored")
+                return
+            }
+            // The day's count is over. Count tomorrow's from zero if time is left.
+            SharedStore.setScheduledEnd(nil, for: .credit)
+            reportCredit()
+            guard SharedStore.blockActive else { return }
+            if !MonitorScheduler.ensureCreditCounting() {
+                // Not counting means not open: better blocked than uncounted.
+                ShieldController.applyStoredShieldsUnlessOpen()
+            }
 
         case .breakGlass:
             // Same for Break Glass: never lift the block before the wait is over.

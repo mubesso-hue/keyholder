@@ -467,15 +467,48 @@ select pg_temp.ok((select credit_seconds = 0 from public.blocks where id = :'tom
 select pg_temp.assert_raises('select public.use_credit()', 'already using time');
 select credit_seconds as left2 from public.stop_credit() \gset
 
--- Time given while not using it goes into the balance, and answers a request.
+-- Time given while locked starts by itself, with what was saved, and answers a request.
 select id as tom_ask from public.request_unlock(30) \gset
 select pg_temp.as_user(:'marc');
-select credit_seconds as left3 from public.give_credit(:'tom', 20) \gset
-select pg_temp.ok(:left3 = :left2 + 1200, 'time given goes into the balance');
+select extract(epoch from (unlock_until - now()))::int as started_len, credit_seconds as left3
+  from public.give_credit(:'tom', 20) \gset
+select pg_temp.ok(:started_len between :left2 + 1190 and :left2 + 1200 and :left3 = 0, 'everything-except: time given starts at once, with what was saved');
+select pg_temp.ok((select pause_until is not null from public.streaks where user_id = :'tom'), 'streak pauses while it runs');
 select pg_temp.ok((select status = 'approved' and approved_minutes = 20 from public.unlock_requests where id = :'tom_ask'), 'it answers the request');
-select pg_temp.ok((select body like 'Use it whenever you like%' from public.notifications where category = 'CREDIT_GIVEN' order by id desc limit 1), 'told to use it whenever');
+select pg_temp.ok((select body like 'Your apps are open now.%' from public.notifications where category = 'CREDIT_GIVEN' order by id desc limit 1), 'told the apps are open');
 select pg_temp.as_user(:'sarah');
 select pg_temp.assert_raises($$select public.give_credit('$$ || :'tom' || $$', 10)$$, 'do not hold an active block');
+
+-- Picked apps: given time opens them at once, and only minutes used count -----------
+select pg_temp.as_user(:'marc');
+select public.create_invite('hold_mine') as code5 \gset
+select pg_temp.as_user(:'sarah');
+select count(*) from public.accept_invite(:'code5');
+select pg_temp.as_user(:'marc');
+select id as marc_block2 from public.start_block(24, 3, 0) \gset
+select device_secret as marc_secret from public.register_device('marc-token') \gset
+select paused_seconds as marc_paused0 from public.streaks where user_id = :'marc' \gset
+select pg_temp.as_user(:'sarah');
+select credit_seconds as m1, (unlock_until is null)::text as m1_closed from public.give_credit(:'marc', 30) \gset
+select pg_temp.ok(:m1 = 1800 and :'m1_closed' = 'true', 'picked apps: time goes into the balance, no clock');
+select pg_temp.ok((select body like 'Your apps are open. It only counts down%' from public.notifications where category = 'CREDIT_GIVEN' order by id desc limit 1), 'told it counts only while used');
+
+select pg_temp.as_nobody();
+select public.device_event(:'marc_secret', 'credit_used', jsonb_build_object('block_id', :'marc_block2', 'used_seconds', 900));
+select pg_temp.ok((select credit_seconds = 900 and credit_used_seconds = 900 from public.blocks where id = :'marc_block2'), 'minutes used come off the balance');
+select public.device_event(:'marc_secret', 'credit_used', jsonb_build_object('block_id', :'marc_block2', 'used_seconds', 900));
+select public.device_event(:'marc_secret', 'credit_used', jsonb_build_object('block_id', :'marc_block2', 'used_seconds', 600));
+select pg_temp.ok((select credit_seconds = 900 from public.blocks where id = :'marc_block2'), 'repeat and late reports change nothing');
+select public.device_event(:'marc_secret', 'credit_used', jsonb_build_object('block_id', :'tom_block', 'used_seconds', 1500));
+select pg_temp.ok((select credit_seconds = 900 from public.blocks where id = :'marc_block2'), 'a report for another block is ignored');
+
+select pg_temp.as_user(:'sarah');
+select credit_seconds as m2 from public.give_credit(:'marc', 15) \gset
+select pg_temp.ok(:m2 = 1800, 'more time adds to what is left');
+select pg_temp.as_user(:'marc');
+select credit_seconds as m3 from public.report_credit_used(:'marc_block2', 3600) \gset
+select pg_temp.ok(:m3 = 0, 'the balance stops at zero');
+select pg_temp.ok((select paused_seconds - :marc_paused0 = 2700 from public.streaks where user_id = :'marc'), 'minutes used do not count toward the streak');
 select pg_temp.as_user(:'marc');
 
 -- Unauthenticated callers are rejected.

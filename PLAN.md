@@ -29,12 +29,16 @@ Decisions already made:
 2. Keyholder gets a push with quick actions: 15 min, 1 hour, deny. Or opens the
    app and picks 15 / 30 / 60 min, 2 hours, a custom amount, or ends the block.
    They can also give time without being asked.
-3. Time given is a **balance**, not a window. 30 minutes given at 3 pm is 30
-   minutes to spend: 15 at 3 pm and 15 at 5 pm, say. The locked person taps
-   **Use my time**; shields drop and the balance counts down while the streak
-   pauses. **Lock again** stops the clock and keeps what's left. When the balance
-   runs out, shields return on their own. Time given while they're using it is
-   added to the running clock. To get more they ask again.
+3. Time given is a **balance**, not a window, and it starts on its own: the
+   locked phone opens the apps as soon as the keyholder gives it (the push
+   wakes the app). 30 minutes given at 3 pm can be 15 at 3 pm and 15 at 5 pm.
+   - **Picked apps:** Screen Time counts only the minutes spent in the blocked
+     apps. No buttons. When it's used up, shields return on their own.
+   - **Everything except:** Screen Time can't count those minutes, so a clock
+     starts when time is given. **Lock again** stops it and saves what's left;
+     **Use my time** spends the saved time later. More time while the clock
+     runs makes it longer.
+   To get more they ask again.
 
 ## 3. Rules
 
@@ -58,11 +62,17 @@ Decisions already made:
 - A keyholder may resign only when the person they guard has no active block.
 
 **Time balance**
-- Screen Time can't count minutes inside "everything except" blocks, so the clock
-  runs while the person has their apps open, which they start and stop.
+- Picked apps: the phone counts with a `DeviceActivity` (`credit`) whose events
+  mark used time as a running total for the block. The monitor extension
+  re-shields when it's used up and reports to the server every 5 minutes and at
+  the end (`credit_used`); the app reports anything the extension missed.
+  Totals only grow, so repeats and late reports are harmless. The count runs to
+  the end of each day and starts again. If the phone can't count, the apps stay
+  blocked rather than open uncounted.
+- Minutes used come off the streak; unused open time doesn't.
 - The balance belongs to the block: it's gone when the block ends.
 - Builds before 6 use `holder_unlock` / `decide_unlock` and still open a window
-  straight away; the locked person can then Lock again to bank the rest.
+  straight away.
 
 **Streak** (continuous time with a live block)
 - Time spent using the balance **pauses** the clock. Those minutes are subtracted.
@@ -142,7 +152,7 @@ server's `blocks` row on every launch, push, realtime change, and extension call
 All client writes go through `security definer` RPCs so invariants hold:
 `create_invite`, `get_invite`, `accept_invite`, `start_block`, `request_unlock`, `decide_unlock`,
 `holder_unlock` (keyholder gives time unasked, e.g. to cut a Break Glass wait short),
-`give_credit`, `use_credit`, `stop_credit` (the time balance, migration 0012),
+`give_credit`, `use_credit`, `stop_credit`, `report_credit_used` (the time balance, migrations 0012–0013),
 `start_break_glass`, `cancel_break_glass`, `complete_break_glass`, `report_revocation`, `end_key`,
 `lengthen_cooling_off`, `heartbeat`, `register_device`, `update_display_name`, `me_snapshot`,
 plus `device_event` (service role) and `cron_tick`.

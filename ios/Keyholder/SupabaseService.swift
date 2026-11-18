@@ -246,6 +246,18 @@ final class SupabaseService {
         try await client.rpc("stop_credit").execute().value
     }
 
+    private struct CreditUsedParams: Encodable {
+        let pBlockId: String
+        let pUsedSeconds: Int
+    }
+
+    /// Given time used on picked apps so far, as a running total (migration 0013).
+    @discardableResult
+    func reportCreditUsed(blockID: UUID, usedSeconds: Int) async throws -> Block {
+        try await client.rpc("report_credit_used", params: CreditUsedParams(
+            pBlockId: blockID.uuidString, pUsedSeconds: usedSeconds)).execute().value
+    }
+
     // MARK: Allowance control (migration 0010)
 
     private struct HolderAllowanceParams: Encodable {

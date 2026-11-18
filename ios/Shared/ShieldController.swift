@@ -18,6 +18,9 @@ extension DeviceActivityName {
     static let allowanceToday = Self("allowanceToday")
     /// Daily schedule whose callbacks give the extension a chance to send a heartbeat.
     static let heartbeat = Self("heartbeat")
+    /// While given time lasts on a block of picked apps: counts the minutes
+    /// spent in them. Runs to the end of the day, then starts again.
+    static let credit = Self("credit")
 }
 
 extension DeviceActivityEvent.Name {
@@ -29,6 +32,16 @@ extension DeviceActivityEvent.Name {
     /// 15 for "allowance.used.15".
     var allowanceUsedMinutes: Int? {
         let prefix = "allowance.used."
+        guard rawValue.hasPrefix(prefix) else { return nil }
+        return Int(rawValue.dropFirst(prefix.count))
+    }
+
+    /// Given time used so far for the block, in seconds, as a running total.
+    static func creditUsed(_ seconds: Int) -> Self { Self("credit.used.\(seconds)") }
+
+    /// 1800 for "credit.used.1800".
+    var creditUsedSeconds: Int? {
+        let prefix = "credit.used."
         guard rawValue.hasPrefix(prefix) else { return nil }
         return Int(rawValue.dropFirst(prefix.count))
     }
@@ -97,6 +110,15 @@ enum ShieldController {
             store.application.denyAppRemoval = true
             return true
         }
+    }
+
+    /// Re-applies the block's shields unless the apps are open for time the
+    /// keyholder gave: a running clock, or given time Screen Time is counting.
+    @discardableResult
+    static func applyStoredShieldsUnlessOpen(now: Date = Date()) -> Bool {
+        if let until = SharedStore.unlockUntil, until > now { return false }
+        if SharedStore.isOpenForGivenTime { return false }
+        return applyStoredShields()
     }
 
     /// Temporary unlock: apps open, but the app itself still cannot be deleted.
@@ -248,6 +270,97 @@ enum MonitorScheduler {
         }
         guard !DeviceActivityCenter().activities.contains(.allowance) else { return }
         try? startAllowance(minutes: SharedStore.allowanceMinutes, selection: selection)
+    }
+
+    // MARK: Given time on blocks of picked apps
+
+    /// What Screen Time counts against given time: the blocked apps, less the
+    /// allowance apps while today's allowance lasts (those are open anyway).
+    static func creditSelection() -> FamilyActivitySelection? {
+        guard SharedStore.blockMode == .selected, var selection = SharedStore.selection else { return nil }
+        if SharedStore.allowanceAvailableToday, let allowance = SharedStore.allowanceSelection {
+            selection.applicationTokens.subtract(allowance.applicationTokens)
+            selection.categoryTokens.subtract(allowance.categoryTokens)
+            selection.webDomainTokens.subtract(allowance.webDomainTokens)
+        }
+        return AppChangePlan.isEmpty(selection) ? nil : selection
+    }
+
+    /// Keeps Screen Time counting while given time is left, and stops when
+    /// none is. Restarting loses the minutes since the last mark, so it only
+    /// restarts when the time given or the counted apps change. Returns
+    /// whether it's counting.
+    @discardableResult
+    static func ensureCreditCounting() -> Bool {
+        guard SharedStore.creditLeftSeconds > 0, let selection = creditSelection() else {
+            stopCreditCounting()
+            return false
+        }
+        if DeviceActivityCenter().activities.contains(.credit),
+           let end = SharedStore.scheduledEnd(for: .credit), end > Date(),
+           SharedStore.creditCountingTotal == SharedStore.creditTotalSeconds,
+           let counted = SharedStore.creditCountedSelection, sameApps(counted, selection) {
+            return true
+        }
+        do {
+            try startCreditCounting(selection: selection)
+            return true
+        } catch {
+            SharedStore.note("credit counting failed: \(error)")
+            stopCreditCounting()
+            return false
+        }
+    }
+
+    /// Counts minutes in `selection` from now to the end of the day, with a
+    /// mark every few minutes and one when the given time is used up.
+    static func startCreditCounting(selection: FamilyActivitySelection) throws {
+        let center = DeviceActivityCenter()
+        let base = SharedStore.creditUsedSeconds
+        let total = SharedStore.creditTotalSeconds
+        guard total > base else { return }
+
+        let now = Date()
+        let calendar = Calendar.current
+        let endOfDay = calendar.date(bySettingHour: 23, minute: 59, second: 59, of: now) ?? now.addingTimeInterval(86_400)
+        let end = max(endOfDay, now.addingTimeInterval(minimumInterval))
+
+        // A restart is reported as an end: tell the extension first.
+        SharedStore.setScheduledEnd(end, for: .credit)
+        SharedStore.creditCountingTotal = total
+        SharedStore.creditCountedSelection = selection
+        if center.activities.contains(.credit) { center.stopMonitoring([.credit]) }
+
+        let minutes = max(1, Int((Double(total - base) / 60).rounded()))
+        let step = minutes <= 60 ? 1 : (minutes <= 240 ? 5 : 15)
+        func event(after m: Int) -> DeviceActivityEvent {
+            DeviceActivityEvent(applications: selection.applicationTokens,
+                                categories: selection.categoryTokens,
+                                webDomains: selection.webDomainTokens,
+                                threshold: DateComponents(minute: m))
+        }
+        var events: [DeviceActivityEvent.Name: DeviceActivityEvent] = [.creditUsed(total): event(after: minutes)]
+        for m in stride(from: step, to: minutes, by: step) {
+            events[.creditUsed(base + m * 60)] = event(after: m)
+        }
+        let components: Set<Calendar.Component> = [.year, .month, .day, .hour, .minute, .second]
+        let schedule = DeviceActivitySchedule(
+            intervalStart: calendar.dateComponents(components, from: now),
+            intervalEnd: calendar.dateComponents(components, from: end),
+            repeats: false
+        )
+        try center.startMonitoring(.credit, during: schedule, events: events)
+    }
+
+    static func stopCreditCounting() {
+        SharedStore.creditCountingTotal = nil
+        SharedStore.creditCountedSelection = nil
+        cancel(.credit)
+    }
+
+    private static func sameApps(_ a: FamilyActivitySelection, _ b: FamilyActivitySelection) -> Bool {
+        a.applicationTokens == b.applicationTokens && a.categoryTokens == b.categoryTokens
+            && a.webDomainTokens == b.webDomainTokens
     }
 
     static func cancelAll() {

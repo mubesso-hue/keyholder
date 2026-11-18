@@ -145,13 +145,18 @@ struct HeroView: View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let now = context.date.addingTimeInterval(state.clockOffset)
             let unlocked = block.isTemporarilyUnlocked(at: now)
+            // Picked apps: open while Screen Time counts the given time.
+            let counting = !unlocked && !block.isAllExcept && SharedStore.isOpenForGivenTime
+            let open = unlocked || counting
             let paused = snapshot.streak.isPaused(at: now)
             let seconds = snapshot.streak.currentSeconds(at: now)
 
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    headline(unlocked ? "Back in a moment." : "Phone down.\nLook up.")
-                    subline(unlocked ? usingLine(block, now: now) : "\(holderName) holds the key.")
+                    headline(open ? "Back in a moment." : "Phone down.\nLook up.")
+                    subline(counting ? countingLine
+                            : unlocked ? usingLine(block, now: now)
+                            : "\(holderName) holds the key.")
                 }
 
                 if !block.verified {
@@ -159,9 +164,9 @@ struct HeroView: View {
                 }
 
                 SessionRing(seconds: seconds,
-                            label: unlocked ? (paused ? "PAUSED" : "OPEN") : "LOCKED",
-                            labelIsOrange: !unlocked,
-                            dim: unlocked,
+                            label: open ? (paused ? "PAUSED" : "OPEN") : "LOCKED",
+                            labelIsOrange: !open,
+                            dim: open,
                             size: compact ? 160 : 200)
                     .padding(.top, compact ? 22 : (block.isBreakingGlass ? 22 : 34))
                     .padding(.bottom, compact ? 16 : (block.isBreakingGlass ? 14 : 26))
@@ -174,7 +179,7 @@ struct HeroView: View {
                 allowanceStatus
                     .padding(.bottom, 4)
 
-                actions(block, unlocked: unlocked)
+                actions(block, unlocked: unlocked, counting: counting)
                     .padding(.top, 18)
 
                 RecordStat(seconds: max(snapshot.streak.bestSeconds, seconds))
@@ -213,11 +218,17 @@ struct HeroView: View {
         return "\(UnlockDuration.format(seconds: left)) left · locks at \(until.shortTime)."
     }
 
-    /// While using time: Lock again. Otherwise: use the time you have, ask for
-    /// more, and Break Glass in plain sight. Change apps sits underneath as a link.
-    private func actions(_ block: Block, unlocked: Bool) -> some View {
+    /// "18 min left. It only counts while you're in your blocked apps."
+    private var countingLine: String {
+        "\(UnlockDuration.format(seconds: SharedStore.creditLeftSeconds)) left. It only counts while you're in your blocked apps."
+    }
+
+    /// Everything-except, while the clock runs: Lock again. Otherwise ask for
+    /// time (or more), use time saved earlier, and Break Glass in plain sight.
+    /// Change apps sits underneath as a link.
+    private func actions(_ block: Block, unlocked: Bool, counting: Bool) -> some View {
         VStack(spacing: 10) {
-            if unlocked {
+            if unlocked && block.isAllExcept {
                 Button("Lock again now") { Task { await state.stopCredit() } }
                     .buttonStyle(GlassPillStyle(fullWidth: true))
                     .disabled(state.busy)
@@ -225,7 +236,8 @@ struct HeroView: View {
                     .font(Theme.helper)
                     .foregroundStyle(Theme.white60)
                     .legibleOnPhoto()
-            } else if block.credit > 0 {
+            } else if !unlocked && block.isAllExcept && block.credit > 0 {
+                // Time saved with Lock again. New time starts on its own.
                 Button("Use my time · \(UnlockDuration.format(seconds: block.credit))") {
                     Task { await state.useCredit() }
                 }
@@ -242,13 +254,13 @@ struct HeroView: View {
                     .padding(.vertical, 12)
                     .legibleOnPhoto()
             } else {
-                Button(block.credit > 0 ? "Ask \(holderName) for more" : "Ask \(holderName) for time") { state.sheet = .request }
+                Button(counting || block.credit > 0 ? "Ask \(holderName) for more" : "Ask \(holderName) for time") { state.sheet = .request }
                     .buttonStyle(GlassPillStyle(fullWidth: true))
                     .disabled(state.busy)
             }
 
             // While Break Glass runs, the panel above shows the countdown and Cancel instead.
-            if block.breakGlassEndsAt == nil && !unlocked {
+            if block.breakGlassEndsAt == nil && !unlocked && !counting {
                 Button("Break Glass") { state.sheet = .breakGlass }
                     .buttonStyle(BreakGlassPillStyle(fullWidth: true))
                     .disabled(state.busy)
@@ -505,6 +517,9 @@ struct HeldKeyRow: View {
             if block.isTemporarilyUnlocked(at: now), let until = block.unlockUntil {
                 Text("Using time · until \(until.shortTime)")
                     .font(.system(size: 12)).foregroundStyle(Theme.white60)
+            } else if !block.isAllExcept && block.credit > 0 {
+                Text("Apps open · \(UnlockDuration.format(seconds: block.credit)) left")
+                    .font(.system(size: 12)).foregroundStyle(Theme.white60)
             } else {
                 HStack(spacing: 6) {
                     Circle().fill(Theme.orangeGradient).frame(width: 6, height: 6)
@@ -519,8 +534,8 @@ struct HeldKeyRow: View {
 
     private func metaLine(_ block: Block, now: Date) -> String {
         var parts = [block.summary, "\(held.requestsThisWeek) requests this week"]
-        if block.credit >= 60 {
-            parts.append("\(UnlockDuration.format(seconds: block.credit)) to use")
+        if block.isAllExcept && block.credit >= 60 {
+            parts.append("\(UnlockDuration.format(seconds: block.credit)) saved")
         }
         if let endsAt = block.breakGlassEndsAt {
             parts.append("Broke the glass, ends in \(StreakState.format(max(0, endsAt.timeIntervalSince(now))))")

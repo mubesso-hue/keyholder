@@ -8,6 +8,7 @@ enum DeviceAPI {
         case requestUnlock = "request_unlock"
         case revoked
         case breakGlassDone = "break_glass_done"
+        case creditUsed = "credit_used"
     }
 
     @discardableResult

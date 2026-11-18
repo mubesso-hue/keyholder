@@ -122,6 +122,64 @@ enum SharedStore {
         set { defaults.set(newValue, forKey: "creditSeconds") }
     }
 
+    // MARK: Given time counted by Screen Time (blocks of picked apps)
+
+    /// The block the counts below belong to.
+    static var creditBlockID: String? {
+        get { defaults.string(forKey: "creditBlockID") }
+        set { defaults.set(newValue, forKey: "creditBlockID") }
+    }
+
+    /// Seconds given in total for this block (used plus left), as last heard
+    /// from the server. 0 for everything-except blocks, which use a clock.
+    static var creditTotalSeconds: Int {
+        get { defaults.integer(forKey: "creditTotalSeconds") }
+        set { defaults.set(newValue, forKey: "creditTotalSeconds") }
+    }
+
+    /// Seconds of given time used, as counted on this phone. Only grows.
+    static var creditUsedSeconds: Int {
+        get { defaults.integer(forKey: "creditUsedSeconds") }
+        set { defaults.set(newValue, forKey: "creditUsedSeconds") }
+    }
+
+    /// The used figure the server has accepted.
+    static var creditReportedSeconds: Int {
+        get { defaults.integer(forKey: "creditReportedSeconds") }
+        set { defaults.set(newValue, forKey: "creditReportedSeconds") }
+    }
+
+    /// The total the running count was started for. nil when not counting.
+    static var creditCountingTotal: Int? {
+        get { defaults.object(forKey: "creditCountingTotal") as? Int }
+        set { defaults.set(newValue, forKey: "creditCountingTotal") }
+    }
+
+    /// The apps the running count covers.
+    static var creditCountedSelection: FamilyActivitySelection? {
+        get {
+            guard let data = defaults.data(forKey: "creditCountedSelection") else { return nil }
+            return try? JSONDecoder().decode(FamilyActivitySelection.self, from: data)
+        }
+        set {
+            if let newValue, let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "creditCountedSelection")
+            } else {
+                defaults.removeObject(forKey: "creditCountedSelection")
+            }
+        }
+    }
+
+    static var creditLeftSeconds: Int { max(0, creditTotalSeconds - creditUsedSeconds) }
+
+    /// True while given time is left and Screen Time is counting it: the
+    /// blocked apps stay open.
+    static var isOpenForGivenTime: Bool { creditLeftSeconds > 0 && creditCountingTotal != nil }
+
+    static func noteCreditUsed(_ seconds: Int) {
+        if seconds > creditUsedSeconds { creditUsedSeconds = seconds }
+    }
+
     /// When this phone last applied an allowance change, in server time. A
     /// change on the server that is newer (from the keyholder) replaces it.
     static var allowanceSetAt: Date? {
@@ -237,5 +295,11 @@ enum SharedStore {
         allowanceExhaustedDay = nil
         allowanceSetAt = nil
         creditSeconds = 0
+        creditBlockID = nil
+        creditTotalSeconds = 0
+        creditUsedSeconds = 0
+        creditReportedSeconds = 0
+        creditCountingTotal = nil
+        creditCountedSelection = nil
     }
 }

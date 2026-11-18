@@ -37,7 +37,9 @@ struct RequestUnlockSheet: View {
                 } header: {
                     Text("How long?")
                 } footer: {
-                    Text("\(holder) decides how much. It goes into your time, and you use it whenever you like.")
+                    Text(state.snapshot?.block?.isAllExcept == true
+                         ? "\(holder) decides how much. Your apps open as soon as they give it; lock again to save the rest."
+                         : "\(holder) decides how much. Your apps open as soon as they give it, and it only counts while you use them.")
                 }
             }
             .navigationTitle("Ask \(holder)")
@@ -126,7 +128,9 @@ struct DecideRequestSheet: View {
                 } header: {
                     Text("Give time")
                 } footer: {
-                    Text("It goes into \(held.profile.displayName)'s balance. They use it when they like, in one go or a bit at a time.")
+                    Text(held.block?.isAllExcept == true
+                         ? "Their apps open right away. They can lock again to save the rest for later."
+                         : "Their apps open right away, and it only counts down while they're using them.")
                 }
 
                 Section {
